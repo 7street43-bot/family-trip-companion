@@ -1,0 +1,25 @@
+{
+  "name": "雙寶出遊小幫手 4.4.0-test3.4",
+  "short_name": "雙寶出遊",
+  "description": "Family Trip Companion｜收藏、Plan B、出遊模式與家庭偏好",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f6f1",
+  "theme_color": "#f8f6f1",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,1052 @@
+{
+  "version": 5,
+  "exportedAt": "2026-08-16T07:50:14.085Z",
+  "checkItems": [
+    {
+      "id": 1,
+      "label": "尿布",
+      "checked": true,
+      "cat": "衛生"
+    },
+    {
+      "id": 2,
+      "label": "尿布墊",
+      "checked": true,
+      "cat": "衛生"
+    },
+    {
+      "id": 3,
+      "label": "溼紙巾、面紙",
+      "checked": true,
+      "cat": "衛生"
+    },
+    {
+      "id": 4,
+      "label": "清潔噴瓶",
+      "checked": true,
+      "cat": "衛生"
+    },
+    {
+      "id": 5,
+      "label": "備用衣褲、口水巾",
+      "checked": true,
+      "cat": "衣物"
+    },
+    {
+      "id": 6,
+      "label": "帽子",
+      "checked": false,
+      "cat": "衣物"
+    },
+    {
+      "id": 7,
+      "label": "夾鏈袋",
+      "checked": true,
+      "cat": "其他"
+    },
+    {
+      "id": 8,
+      "label": "空的塑膠袋",
+      "checked": true,
+      "cat": "其他"
+    },
+    {
+      "id": 9,
+      "label": "副食品",
+      "checked": true,
+      "cat": "飲食"
+    },
+    {
+      "id": 10,
+      "label": "米餅",
+      "checked": true,
+      "cat": "飲食"
+    },
+    {
+      "id": 11,
+      "label": "食物剪",
+      "checked": true,
+      "cat": "飲食"
+    },
+    {
+      "id": 12,
+      "label": "湯匙",
+      "checked": false,
+      "cat": "飲食"
+    },
+    {
+      "id": 13,
+      "label": "水杯",
+      "checked": false,
+      "cat": "飲食"
+    },
+    {
+      "id": 14,
+      "label": "藥(甲狀腺)",
+      "checked": false,
+      "cat": "其他"
+    },
+    {
+      "id": 15,
+      "label": "奶瓶",
+      "checked": false,
+      "cat": "飲食"
+    },
+    {
+      "id": 16,
+      "label": "奶粉",
+      "checked": false,
+      "cat": "飲食"
+    },
+    {
+      "id": 17,
+      "label": "保久乳",
+      "checked": false,
+      "cat": "飲食"
+    }
+  ],
+  "attractions": [
+    {
+      "id": 1,
+      "name": "野趣森林",
+      "region": "1",
+      "city": "中壢",
+      "note": "六日營業",
+      "url": "https://www.facebook.com/share/r/1Hbk9Cb2sC/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 2,
+      "name": "兒童美術館",
+      "region": "1",
+      "city": "桃園",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSH8ouuLo/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 3,
+      "name": "六福村",
+      "region": "1",
+      "city": "新竹",
+      "note": "",
+      "url": "",
+      "visited": true,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 4,
+      "name": "小人國",
+      "region": "1",
+      "city": "新竹",
+      "note": "",
+      "url": "",
+      "visited": true,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 5,
+      "name": "綠世界",
+      "region": "1",
+      "city": "新竹",
+      "note": "",
+      "url": "",
+      "visited": true,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 6,
+      "name": "遊戲愛樂園",
+      "region": "1",
+      "city": "新竹",
+      "note": "大魯閣內",
+      "url": "https://tisshuang.com/blog/post/hsinchu-trkmall",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 7,
+      "name": "兒童新樂園",
+      "region": "2",
+      "city": "士林",
+      "note": "",
+      "url": "",
+      "visited": true,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 8,
+      "name": "幸福20號農場",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "週二至四休",
+      "url": "https://www.facebook.com/share/r/18ZRvN3h3U/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 9,
+      "name": "那山那谷",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://youtu.be/3igwiP3P6HE?si=sXZWph3PYrxNRcEh",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 10,
+      "name": "星夢森林劇場",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHLdhXSw/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 11,
+      "name": "興仁花園夜市",
+      "region": "2",
+      "city": "樹林",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHLeE6a4/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 12,
+      "name": "樂予工作坊",
+      "region": "3",
+      "city": "台中",
+      "note": "做工的人",
+      "url": "https://vt.tiktok.com/ZSHLqMjhv/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 13,
+      "name": "啵比星球",
+      "region": "3",
+      "city": "台中",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSUbBx23b/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 14,
+      "name": "九九峰動物園",
+      "region": "3",
+      "city": "南投",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHLqeu95/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 15,
+      "name": "九族文化村",
+      "region": "3",
+      "city": "南投",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 16,
+      "name": "好田森林",
+      "region": "3",
+      "city": "彰化",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHLqYmYc/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 17,
+      "name": "順達磚窯、花樹銀行",
+      "region": "3",
+      "city": "彰化",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1BtzBiYkoE/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 18,
+      "name": "螢螢滑森樂園",
+      "region": "3",
+      "city": "彰化",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqytur/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 19,
+      "name": "古生物奇幻樂園",
+      "region": "3",
+      "city": "彰化",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqCv7A/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 20,
+      "name": "烏山獼猴保育區",
+      "region": "4",
+      "city": "台南",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqCaBj/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 21,
+      "name": "給小孩",
+      "region": "4",
+      "city": "台南",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFq9xn6/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 22,
+      "name": "海洋生物博物館",
+      "region": "4",
+      "city": "屏東",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 23,
+      "name": "義大世界",
+      "region": "4",
+      "city": "高雄",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqPJRF/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 24,
+      "name": "遊戲愛樂園",
+      "region": "4",
+      "city": "高雄",
+      "note": "室內",
+      "url": "https://vt.tiktok.com/ZSHFqAhdV/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 25,
+      "name": "冷研探索館",
+      "region": "4",
+      "city": "嘉義",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFbFjv5/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 26,
+      "name": "花蓮綠森林親水公園",
+      "region": "5",
+      "city": "花蓮",
+      "note": "夏季玩水",
+      "url": "https://vt.tiktok.com/ZSHFqGdNV/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 27,
+      "name": "遠雄海洋公園",
+      "region": "5",
+      "city": "花蓮",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 28,
+      "name": "劍湖山樂園",
+      "region": "4",
+      "city": "雲林",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqGhhu/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 29,
+      "name": "寶熊漁樂碼頭",
+      "region": "3",
+      "city": "台中",
+      "note": "室內",
+      "url": "https://vt.tiktok.com/ZSHFbLpbU/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 30,
+      "name": "頑皮世界",
+      "region": "4",
+      "city": "台南",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHFqgd29/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 31,
+      "name": "桃園軌道願景館",
+      "region": "1",
+      "city": "桃園",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1CYrtAu93A/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 32,
+      "name": "東勢林場",
+      "region": "3",
+      "city": "台中",
+      "note": "",
+      "url": "https://tw.trip.com/?SID=2209817&allianceid=1094387&trip_sub1=4805fe3cb3744ebbaa5b4b1ff-711520&utm_campaign=711520&locale=zh-tw&fbclid=IwRlRTSAQ3999leHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEe5dxZrM0MVX8t5TuUSUWNzHDV5WpaIythm45NyK97zNl6pS2Nd-1krYCdjpE_aem_0VCLY7Uat8ylnkEcNoqP2g",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 33,
+      "name": "美樂地親子農場",
+      "region": "3",
+      "city": "后里",
+      "note": "",
+      "url": "https://fullfenblog.tw/happy-melody-petfarm/?fbclid=IwZnRzaAPAvQ1leHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEeQOKqp4M5KkcmVR4UTts6eQ62zGkZObfR8Suo2IdbvhlWP1usld8b_yOVAs8_aem_AGz-8lrsQII7wh7dG0Vifg",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 34,
+      "name": "Mitsui Shopping Park LaLaport 台中",
+      "region": "3",
+      "city": "台中",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1byFeh6qhF/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 35,
+      "name": "新平溪煤礦博物園區",
+      "region": "2",
+      "city": "新北",
+      "note": "",
+      "url": "https://myjourney.tw/taiwancoal/#google_vignette",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 36,
+      "name": "KHTOY絨毛玩偶旗艦館",
+      "region": "4",
+      "city": "嘉義",
+      "note": "",
+      "url": "https://share.google/uamfbvUpLLibfgyA9",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 37,
+      "name": "台中樂米樂園 旗艦店北歐館",
+      "region": "3",
+      "city": "台中",
+      "note": "",
+      "url": "https://bobowin.blog/taichung-love-me/",
+      "visited": true,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 38,
+      "name": "台塑文化館",
+      "region": "1",
+      "city": "桃園",
+      "note": "室內",
+      "url": "https://www.facebook.com/share/r/1LAjxEZYCW/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 39,
+      "name": "全台20間博物館",
+      "region": "1",
+      "city": "",
+      "note": "",
+      "url": "https://smiletaiwan.cw.com.tw/index.php/article/8062",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 40,
+      "name": "千巧谷牛樂園牧場",
+      "region": "4",
+      "city": "雲林",
+      "note": "",
+      "url": "https://fullfenblog.tw/yl-chanchauku/?fbclid=IwZnRzaAQ7HFZleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEegKW7W2ijPTLTbRUa9sTOkjbw6B2TfI_YRDNE2GS3aB9HEIYISw6hw_V8PhE_aem_S-HHHYQQyMk3FQl9iVyrJg",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 41,
+      "name": "野森動物學校",
+      "region": "4",
+      "city": "高雄",
+      "note": "",
+      "url": "https://fullfenblog.tw/yessen/?fbclid=IwZnRzaAQ7OrFleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEe36rofRHUJlsqHNUzlWr4F9JSDCqKGHNSQoVv9BNFzZ-9OthpoujSt3KGVrQ_aem_PgMLOaIGWbECPlsJMN1S1w#google_vignette",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 42,
+      "name": "橋聳雲天兒童遊戲場",
+      "region": "3",
+      "city": "南投",
+      "note": "",
+      "url": "https://bobowin.blog/nantou-highway-park/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 43,
+      "name": "水行俠",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://taiwanwaterbike.rezio.shop/zh-TW?fbclid=IwVERDUAQ7VitleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEeY4XM26nxYzPwydlmqirZA6NLMU9A6uL1UwqB9DgoRb_-lTvyGcmBNS_0O_A_aem_sa40nWtlMLVEME3dPlfsxA#products",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 44,
+      "name": "戶羽機關車園區",
+      "region": "3",
+      "city": "彰化",
+      "note": "",
+      "url": "https://fullfenblog.tw/roundhouse-railway/?fbclid=IwZnRzaAQ8QpNleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEeN3-fd7qmZWOaDThHAxGQND5x1-skkIEZLdKwVdRJR98ec_7D_mVcD0WS2Yw_aem_7XIymbapV1N5Dj9oFzAmUw#google_vignette",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 45,
+      "name": "大有梯田生態公園",
+      "region": "1",
+      "city": "桃園",
+      "age": "",
+      "note": "威天宮山腳下",
+      "url": "https://bobowin.blog/dayou-park/",
+      "visited": false,
+      "latlng": ""
+    },
+    {
+      "id": 46,
+      "name": "十三行文化公園",
+      "region": "2",
+      "city": "新北市八里",
+      "age": "滑草5歲，溜滑梯(高速)6歲",
+      "note": "",
+      "url": "https://natsuphil.com/new-taipei/13-park/",
+      "visited": false,
+      "latlng": ""
+    },
+    {
+      "id": 47,
+      "name": "百果山探索樂園",
+      "region": "3",
+      "city": "彰化",
+      "age": "",
+      "note": "",
+      "url": "https://fullfenblog.tw/baiguoshan/",
+      "latlng": "https://maps.app.goo.gl/CVLiyW6a2tzHk3LNA?g_st=ic",
+      "visited": false
+    },
+    {
+      "id": 48,
+      "name": "五年千歲公園",
+      "region": "4",
+      "city": "雲林",
+      "age": "三四歲以上",
+      "note": "",
+      "url": "https://bunnyann.tw/gochitose-temple-2026/?fbclid=IwRlRTSARAuPlleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEe8qaI0Gc9qycikSTUgdHnGfTGo_BfWkqQVbMlGTbJLrlllkkk8dIgwhjWK98_aem_3t-2QaQbr0vBdfMNBVnzTw#google_vignette",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 49,
+      "name": "幸福20號農場",
+      "region": "2",
+      "city": "宜蘭",
+      "age": "3-7歲",
+      "note": "",
+      "url": "https://izzychou.com/20happy/",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 50,
+      "name": "光明公園-四大主題遊戲場",
+      "region": "1",
+      "city": "桃園-中壢",
+      "age": "2-12  5-12",
+      "note": "",
+      "url": "https://bobowin.blog/p4008/",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 51,
+      "name": "大立空中樂園",
+      "region": "4",
+      "city": "高雄",
+      "age": "3歲後安排",
+      "note": "",
+      "url": "https://ajay.com.tw/taleerizz/",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 52,
+      "name": "北海岸一日遊",
+      "region": "2",
+      "city": "新北市金山",
+      "age": "",
+      "note": "鹿羽松牧場、朱銘美術館",
+      "url": "https://www.facebook.com/share/r/1D3QY2uf2t/?mibextid=wwXIfr",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 53,
+      "name": "祥儀機器人夢工廠",
+      "region": "1",
+      "city": "桃園",
+      "age": "",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1DizpWgkn7/?mibextid=wwXIfr",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 54,
+      "name": "台灣玩具博物館",
+      "region": "2",
+      "city": "新北市板橋",
+      "age": "",
+      "note": "",
+      "url": "https://queenienie.pixnet.net/blog/posts/14222574267",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 55,
+      "name": "熊猴森公園",
+      "region": "2",
+      "city": "新北三重",
+      "age": "5歲以上",
+      "note": "",
+      "url": "https://bobowin.blog/bear-monkey-park/",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 56,
+      "name": "鰲峰山公園谷溜遊戲場",
+      "region": "3",
+      "city": "台中清水",
+      "age": "",
+      "note": "34道溜滑梯",
+      "url": "https://myjourney.tw/valley-slide-park/",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 57,
+      "name": "故宮南院",
+      "region": "4",
+      "city": "嘉義",
+      "age": "",
+      "note": "",
+      "url": "https://natsuphil.com/chiayi/museum/?fbclid=IwRlRTSASFR7RleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAo2NjI4NTY4Mzc5AAEeRgIaOvEF8bs24jtYcOF0Gy7Du5NcD5VS26kIcOdoUDvkCoJDX0iC4YMMdO8_aem_3einkJErfgc_0m6xXVUz1A#google_vignette",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 58,
+      "name": "小人國動感新樂園",
+      "region": "1",
+      "city": "桃園",
+      "age": "",
+      "note": "",
+      "url": "https://c221434.pixnet.net/blog/posts/49565000",
+      "latlng": "",
+      "visited": false
+    },
+    {
+      "id": 59,
+      "name": "Mini boss",
+      "region": "2",
+      "city": "台北 新光三越",
+      "age": "",
+      "note": "",
+      "url": "https://s.klook.com/c/mXDLrRGjyP",
+      "latlng": "",
+      "visited": false
+    }
+  ],
+  "hotels": [
+    {
+      "id": 1,
+      "name": "悅華大酒店",
+      "region": "1",
+      "city": "桃園",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHMkj3CB/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 2,
+      "name": "牛仔星村",
+      "region": "1",
+      "city": "桃園",
+      "note": "一泊三食露營",
+      "url": "https://bobowin.blog/p4135/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 3,
+      "name": "笠復威斯汀度假飯店",
+      "region": "1",
+      "city": "桃園",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 4,
+      "name": "煙波大飯店 新竹湖濱館",
+      "region": "1",
+      "city": "新竹",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 5,
+      "name": "雀客童媽吉親子飯店",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://www.instagram.com/reel/C7kyuayB5U1/?igsh=ZmJzM3d4ZmNqYnFn",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 6,
+      "name": "蘭城晶英酒店",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://vivianexplore.tw/silks-place-yilan/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 7,
+      "name": "凱渡廣場酒店",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "",
+      "url": "https://bobowin.blog/archipelago/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 8,
+      "name": "淡水福容飯店",
+      "region": "2",
+      "city": "淡水",
+      "note": "遊戲空間大",
+      "url": "https://bobowin.blog/fullon-tamsui/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 9,
+      "name": "姜悦酒店野柳渡假村",
+      "region": "2",
+      "city": "萬里",
+      "note": "大一點時才好玩",
+      "url": "https://bobowin.blog/inhouse-hotel-yehliu/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 10,
+      "name": "3JD home",
+      "region": "3",
+      "city": "南投",
+      "note": "懶人露營",
+      "url": "https://www.facebook.com/share/r/1CptjRL8hj/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 11,
+      "name": "晶盈親旅大酒店",
+      "region": "4",
+      "city": "台南",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHMkEQAL/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 12,
+      "name": "和逸飯店",
+      "region": "4",
+      "city": "台南",
+      "note": "超狂遊樂區",
+      "url": "https://vivianexplore.tw/hotel-cozzi-ximen-tainan/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 13,
+      "name": "台南趣淘漫旅",
+      "region": "4",
+      "city": "台南",
+      "note": "",
+      "url": "",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 14,
+      "name": "新悅花園飯店",
+      "region": "4",
+      "city": "嘉義",
+      "note": "",
+      "url": "https://vt.tiktok.com/ZSHMBd4EG/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 15,
+      "name": "棒棒積木飯店",
+      "region": "4",
+      "city": "嘉義",
+      "note": "有電動車、遊樂區",
+      "url": "https://bobowin.blog/brickhotel/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 16,
+      "name": "瑞穗天合國際觀光酒店",
+      "region": "5",
+      "city": "花蓮",
+      "note": "",
+      "url": "https://bobowin.blog/hualien-grandcosmos/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 17,
+      "name": "瓏山林蘇澳冷熱泉度假飯店",
+      "region": "2",
+      "city": "宜蘭",
+      "note": "搭配七月潑水節",
+      "url": "https://bobowin.blog/2016-07-25-154/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 18,
+      "name": "大板根森林溫泉酒店",
+      "region": "2",
+      "city": "三峽",
+      "note": "",
+      "url": "https://bobowin.blog/the-great-roots/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 19,
+      "name": "溪頭米堤大飯店",
+      "region": "3",
+      "city": "南投",
+      "note": "",
+      "url": "https://bobowin.blog/lemidi/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 20,
+      "name": "墾丁悠活渡假村",
+      "region": "4",
+      "city": "屏東",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1DW9Npii7X/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 21,
+      "name": "花蓮遠雄悅來大飯店",
+      "region": "5",
+      "city": "花蓮",
+      "note": "",
+      "url": "https://bobowin.blog/farglory-hotel/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 22,
+      "name": "朋趣一泊四食",
+      "region": "1",
+      "city": "龍潭",
+      "note": "",
+      "url": "https://taoyuan.cosmos-otium.com/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 23,
+      "name": "全台親子飯店",
+      "region": "1",
+      "city": "",
+      "note": "",
+      "url": "https://bobowin.blog/child-hotel/",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 24,
+      "name": "嘉義福容voco",
+      "region": "4",
+      "city": "嘉義",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/18aXrEZumr/?mibextid=wwXIfr",
+      "visited": false,
+      "age": "",
+      "latlng": ""
+    },
+    {
+      "id": 25,
+      "name": "礁溪寒沐酒店",
+      "region": "2",
+      "city": "宜蘭",
+      "age": "",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1FxMxdk6Uq/?mibextid=wwXIfr",
+      "latlng": "",
+      "visited": false
+    }
+  ],
+  "foods": [
+    {
+      "id": 300,
+      "name": "遊戲：嘴巴手拿不一樣",
+      "region": "1",
+      "city": "1",
+      "age": "",
+      "note": "",
+      "url": "https://www.facebook.com/share/r/1D1UXAbQyb/?mibextid=wwXIfr",
+      "latlng": "",
+      "visited": false,
+      "mealTypes": [],
+      "price": "",
+      "seat": ""
+    }
+  ]
+}
