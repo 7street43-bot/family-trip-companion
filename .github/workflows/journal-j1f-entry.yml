@@ -1,0 +1,92 @@
+name: Journal J1F Three Interface Entry
+
+on:
+  push:
+    branches: [preview]
+    paths:
+      - 'public/journal-ui.mjs'
+      - 'public/journal.css'
+      - 'public/journal-browser.mjs'
+      - 'public/index.html'
+      - 'public/version.json'
+      - 'public/sw.js'
+      - 'netlify/functions/journal-gpt.mjs'
+      - 'tests/journal-j1f-ui.test.mjs'
+      - 'docs/JOURNAL_GPT_CONNECTOR.md'
+      - '.github/workflows/journal-j1f-entry.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: journal-j1f-three-interface-entry
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare Journal modules
+        run: node scripts/prepare-site.mjs
+      - name: Static checks
+        run: |
+          set -euo pipefail
+          node --check public/journal-ui.mjs
+          node --check public/journal-browser.mjs
+          node --check netlify/functions/journal-gpt.mjs
+          node --check public/sw.js
+          node --test tests/journal-j1f-ui.test.mjs
+      - name: J1F interface invariants
+        run: |
+          set -euo pipefail
+          grep -Fq 'journal-ui.mjs' public/index.html
+          grep -Fq 'journal.css' public/index.html
+          grep -Fq "QUEUE_KEY='journalJ1FQueue'" public/journal-ui.mjs
+          grep -Fq 'Preview 安全模式不會寫入或排入正式日誌' public/journal-ui.mjs
+          grep -Fq "source:'gpt'" netlify/functions/journal-gpt.mjs
+          ! grep -R "SERVICE_ROLE\|service_role" -n public/journal-ui.mjs public/journal-browser.mjs netlify/functions/journal-gpt.mjs
+          node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(v.version!=='4.5.0-phase1.4-j1f') process.exit(1)"
+      - name: Result
+        run: echo 'J1F MOBILE + DESKTOP + GPT CONTRACT = PASS'
+
+  preview-smoke:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for fixed Preview deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          ok=0
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 1 --retry-all-errors --retry-delay 1 "$base/version.json?j1f=$GITHUB_SHA" -o /tmp/v.json; then
+              live=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/tmp/v.json','utf8')).version)")
+              if [ "$live" = "$expected" ]; then ok=1; break; fi
+            fi
+            sleep 5
+          done
+          test "$ok" = 1 || { echo 'J1F Preview deploy did not reach expected version'; exit 1; }
+      - name: Mobile/desktop asset delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          for p in /journal-ui.mjs /journal.css /journal-browser.mjs /lib/journal-client.mjs /lib/journal-supabase-transport.mjs; do
+            code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1f=$GITHUB_SHA")
+            test "$code" = 200 || { echo "$p -> $code"; exit 1; }
+          done
+          curl --fail --silent --show-error --location "$base/?j1f=$GITHUB_SHA" -o /tmp/index.html
+          grep -Fq 'journal-ui.mjs' /tmp/index.html
+          grep -Fq 'journal.css' /tmp/index.html
+      - name: GPT gateway fail-closed smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://preview--comfy-heliotrope-475c71.netlify.app/api/journal-gpt'
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /tmp/noauth.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"command":"createEntry","input":{"entryDate":"2026-09-07","summary":"must-not-write"},"mutationId":"11111111-1111-4111-8111-111111111111"}' "$url")
+          test "$code" = 401 || { cat /tmp/noauth.json; exit 1; }
+          grep -Fq 'missing_bearer_token' /tmp/noauth.json
+      - name: Result
+        run: echo 'J1F PREVIEW ENTRY + AUTH GATE = PASS'
