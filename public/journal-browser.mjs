@@ -61,7 +61,18 @@ export function createBrowserJournalBinding({
       if (error) throw error;
       state.session = data?.session || null;
       state.source = detectBrowserJournalSource(env);
-      return await getStatus();
+      const currentOrigin = originOf(env);
+      return {
+        configured:true,
+        authenticated:!!state.session,
+        user:state.session?.user || null,
+        originMatch:!!currentOrigin && currentOrigin === cfg.siteOrigin,
+        siteOrigin:cfg.siteOrigin,
+        currentOrigin,
+        source:state.source,
+        workspaceId:state.workspaceId,
+        error:null
+      };
     })().catch(err => {
       state.lastError = err?.message || String(err);
       state.initPromise = null;
@@ -71,7 +82,7 @@ export function createBrowserJournalBinding({
   }
 
   async function refreshSession() {
-    await init();
+    if (!state.supabase) await init();
     const { data, error } = await state.supabase.auth.getSession();
     if (error) throw error;
     state.session = data?.session || null;
