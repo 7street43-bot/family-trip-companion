@@ -1,11 +1,11 @@
-const CACHE = 'twin-trip-v4.5.0-phase1.3-j1e';
+const CACHE = 'twin-trip-v4.5.0-phase1.4-j1f';
 const CORE_PATHS = new Set([
-  '/', '/index.html', '/app.css', '/db.js', '/cloud-sync.js', '/journal-browser.mjs',
+  '/', '/index.html', '/app.css', '/journal.css', '/db.js', '/cloud-sync.js', '/journal-browser.mjs', '/journal-ui.mjs',
   '/lib/journal-client.mjs', '/lib/journal-supabase-transport.mjs',
   '/app.js', '/manifest.webmanifest', '/seed-data.json', '/version.json', '/decision-metadata.json'
 ]);
 const PRECACHE = [
-  './index.html', './app.css', './db.js', './cloud-sync.js', './journal-browser.mjs',
+  './index.html', './app.css', './journal.css', './db.js', './cloud-sync.js', './journal-browser.mjs', './journal-ui.mjs',
   './lib/journal-client.mjs', './lib/journal-supabase-transport.mjs', './app.js',
   './manifest.webmanifest', './seed-data.json', './version.json', './decision-metadata.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
