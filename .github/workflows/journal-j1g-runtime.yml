@@ -6,6 +6,7 @@ on:
     paths:
       - 'public/journal-browser.mjs'
       - 'public/journal-media-ui.mjs'
+      - 'public/journal-media-preview-demo.mjs'
       - 'public/journal-media.css'
       - 'public/index.html'
       - 'public/version.json'
@@ -14,6 +15,7 @@ on:
       - 'shared/journal-media-supabase-transport.mjs'
       - 'scripts/prepare-site.mjs'
       - 'tests/journal-j1g-runtime.test.mjs'
+      - 'tests/journal-j1g-preview-demo.test.mjs'
       - '.github/workflows/journal-j1g-runtime.yml'
   workflow_dispatch:
 
@@ -33,6 +35,7 @@ jobs:
           set -euo pipefail
           node --check public/journal-browser.mjs
           node --check public/journal-media-ui.mjs
+          node --check public/journal-media-preview-demo.mjs
           node --check public/sw.js
           node --check public/lib/journal-media-client.mjs
           node --check public/lib/journal-media-supabase-transport.mjs
@@ -40,24 +43,32 @@ jobs:
         run: |
           set -euo pipefail
           node --test tests/journal-j1g-runtime.test.mjs
+          node --test tests/journal-j1g-preview-demo.test.mjs
           node --test tests/journal-j1f-ui.test.mjs
       - name: Security and packaging invariants
         run: |
           set -euo pipefail
-          grep -Fq "4.5.0-phase1.6-j1g.1" public/version.json
+          grep -Fq "4.5.0-phase1.6-j1g.2" public/version.json
           grep -Fq 'journal-media-ui.mjs' public/index.html
+          grep -Fq 'journal-media-preview-demo.mjs' public/index.html
           grep -Fq 'journal-media.css' public/index.html
           grep -Fq 'journal-media-client.mjs' public/sw.js
           grep -Fq 'journal-media-supabase-transport.mjs' public/sw.js
+          grep -Fq 'journal-media-preview-demo.mjs' public/sw.js
           grep -Fq "Preview 安全模式只驗收相簿介面，不會上傳正式照片" public/journal-media-ui.mjs
+          grep -Fq "preview--comfy-heliotrope-475c71.netlify.app" public/journal-media-preview-demo.mjs
+          grep -Fq "不上傳、不建立日誌" public/journal-media-preview-demo.mjs
           grep -Fq "25*1024*1024" public/journal-media-ui.mjs
           grep -Fq "mediaSignedUrl" public/journal-browser.mjs
           grep -Fq "uploadPhoto" public/journal-browser.mjs
+          ! grep -Fq "uploadPhoto" public/journal-media-preview-demo.mjs
+          ! grep -Fq "mediaSignedUrl" public/journal-media-preview-demo.mjs
+          ! grep -Fq "supabase" public/journal-media-preview-demo.mjs
           test -f public/lib/journal-media-client.mjs
           test -f public/lib/journal-media-supabase-transport.mjs
-          ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
+          ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
       - name: Result
-        run: echo 'J1G PHOTO ALBUM RUNTIME CONTRACT = PASS'
+        run: echo 'J1G PHOTO ALBUM + FIXED PREVIEW LOCAL DEMO CONTRACT = PASS'
 
   preview-smoke:
     needs: contract
@@ -82,17 +93,23 @@ jobs:
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /journal-media-ui.mjs /journal-media.css /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
+          for p in /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-media.css /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1g=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
           curl --fail --silent --show-error --location "$base/?j1g=$GITHUB_SHA" -o /tmp/index.html
           grep -Fq 'journal-media-ui.mjs' /tmp/index.html
+          grep -Fq 'journal-media-preview-demo.mjs' /tmp/index.html
           grep -Fq 'journal-media.css' /tmp/index.html
       - name: Preview remains write-safe
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --location 'https://preview--comfy-heliotrope-475c71.netlify.app/journal-media-ui.mjs' -o /tmp/media-ui.mjs
+          curl --fail --silent --show-error --location 'https://preview--comfy-heliotrope-475c71.netlify.app/journal-media-preview-demo.mjs' -o /tmp/preview-demo.mjs
           grep -Fq 'Preview 安全模式只驗收相簿介面，不會上傳正式照片' /tmp/media-ui.mjs
+          grep -Fq '照片只存在目前 Safari 記憶體；不上傳、不建立日誌，關閉日誌或重整即清除。' /tmp/preview-demo.mjs
+          grep -Fq "const PREVIEW_HOST='preview--comfy-heliotrope-475c71.netlify.app'" /tmp/preview-demo.mjs
+          ! grep -Fq 'uploadPhoto' /tmp/preview-demo.mjs
+          ! grep -Fq 'mediaSignedUrl' /tmp/preview-demo.mjs
       - name: Result
-        run: echo 'J1G PREVIEW PHOTO ALBUM DELIVERY = PASS'
+        run: echo 'J1G PREVIEW LOCAL PHOTO UX + WRITE-SAFE DELIVERY = PASS'
