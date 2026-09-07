@@ -10,6 +10,7 @@ on:
       - 'public/journal-media.css'
       - 'public/journal-nav-bridge.mjs'
       - 'public/journal-nav.css'
+      - 'public/journal-stable.css'
       - 'public/index.html'
       - 'public/version.json'
       - 'public/sw.js'
@@ -48,15 +49,16 @@ jobs:
           node --test tests/journal-j1g-runtime.test.mjs
           node --test tests/journal-j1g-preview-demo.test.mjs
           node --test tests/journal-j1f-ui.test.mjs
-      - name: Security packaging and navigation invariants
+      - name: Security packaging navigation and stable-layout invariants
         run: |
           set -euo pipefail
-          grep -Fq "4.5.0-phase1.6-j1g.4" public/version.json
+          grep -Fq "4.5.0-phase1.6-j1g.5" public/version.json
           grep -Fq 'journal-media-ui.mjs' public/index.html
           grep -Fq 'journal-media-preview-demo.mjs' public/index.html
           grep -Fq 'journal-media.css' public/index.html
           grep -Fq 'journal-nav-bridge.mjs' public/index.html
           grep -Fq 'journal-nav.css' public/index.html
+          grep -Fq 'journal-stable.css' public/index.html
           grep -Fq 'data-journal-nav' public/index.html
           ! grep -Fq 'data-view="journal"' public/index.html
           grep -Fq 'journal-media-client.mjs' public/sw.js
@@ -64,6 +66,7 @@ jobs:
           grep -Fq 'journal-media-preview-demo.mjs' public/sw.js
           grep -Fq 'journal-nav-bridge.mjs' public/sw.js
           grep -Fq 'journal-nav.css' public/sw.js
+          grep -Fq 'journal-stable.css' public/sw.js
           grep -Fq "Preview 安全模式只驗收相簿介面，不會上傳正式照片" public/journal-media-ui.mjs
           grep -Fq "preview--comfy-heliotrope-475c71.netlify.app" public/journal-media-preview-demo.mjs
           grep -Fq "不上傳、不建立日誌" public/journal-media-preview-demo.mjs
@@ -78,6 +81,12 @@ jobs:
           grep -Fq 'waitForFab' public/journal-nav-bridge.mjs
           grep -Fq 'ev.stopPropagation()' public/journal-nav-bridge.mjs
           ! grep -Fq 'n.disabled=!fab()' public/journal-nav-bridge.mjs
+          grep -Fq 'height:92dvh' public/journal-stable.css
+          grep -Fq 'min-height:92dvh' public/journal-stable.css
+          grep -Fq 'max-height:92dvh' public/journal-stable.css
+          grep -Fq 'height:48px' public/journal-stable.css
+          grep -Fq 'flex:1 1 auto' public/journal-stable.css
+          grep -Fq 'min-height:0' public/journal-stable.css
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('public/index.html','utf8');
@@ -90,7 +99,7 @@ jobs:
           test -f public/lib/journal-media-supabase-transport.mjs
           ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
       - name: Result
-        run: echo 'J1G PHOTO ALBUM + JOURNAL BOTTOM NAV RACE FIX CONTRACT = PASS'
+        run: echo 'J1G PHOTO ALBUM + JOURNAL STABLE MOBILE LAYOUT CONTRACT = PASS'
 
   preview-smoke:
     needs: contract
@@ -111,11 +120,11 @@ jobs:
             sleep 5
           done
           test "$ok" = 1 || { echo 'J1G Preview did not reach expected version'; exit 1; }
-      - name: Album and journal-nav asset delivery
+      - name: Album journal-nav and stable-layout asset delivery
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-media.css /journal-nav-bridge.mjs /journal-nav.css /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
+          for p in /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-media.css /journal-nav-bridge.mjs /journal-nav.css /journal-stable.css /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1g=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
@@ -125,6 +134,7 @@ jobs:
           grep -Fq 'journal-media.css' /tmp/index.html
           grep -Fq 'journal-nav-bridge.mjs' /tmp/index.html
           grep -Fq 'journal-nav.css' /tmp/index.html
+          grep -Fq 'journal-stable.css' /tmp/index.html
           grep -Fq 'id="journalNavBtn"' /tmp/index.html
           grep -Fq 'data-journal-nav' /tmp/index.html
           ! grep -Fq 'data-view="journal"' /tmp/index.html
@@ -139,4 +149,4 @@ jobs:
           ! grep -Fq 'uploadPhoto' /tmp/preview-demo.mjs
           ! grep -Fq 'mediaSignedUrl' /tmp/preview-demo.mjs
       - name: Result
-        run: echo 'J1G PREVIEW JOURNAL NAV RACE FIX + PHOTO UX DELIVERY = PASS'
+        run: echo 'J1G PREVIEW JOURNAL STABLE MOBILE LAYOUT + PHOTO UX DELIVERY = PASS'
