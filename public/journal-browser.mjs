@@ -1,5 +1,7 @@
 import { createJournalClient, JournalClientError } from './lib/journal-client.mjs';
 import { createSupabaseJournalTransport } from './lib/journal-supabase-transport.mjs';
+import { createJournalMediaClient } from './lib/journal-media-client.mjs';
+import { createSupabaseJournalMediaTransport } from './lib/journal-media-supabase-transport.mjs';
 
 const CLIENT_MODULE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -27,7 +29,9 @@ export function createBrowserJournalBinding({
     session: null,
     workspaceId: null,
     journalClient: null,
+    mediaClient: null,
     source: null,
+    mediaSource: null,
     lastError: null
   };
 
@@ -146,11 +150,36 @@ export function createBrowserJournalBinding({
     return state.journalClient;
   }
 
+  async function getMediaClient() {
+    const supabase = await requireReady();
+    const source = detectBrowserJournalSource(env);
+    if (!state.mediaClient || state.mediaSource !== source) {
+      state.mediaSource = source;
+      state.mediaClient = createJournalMediaClient({
+        source,
+        transport:createSupabaseJournalMediaTransport(supabase)
+      });
+    }
+    return state.mediaClient;
+  }
+
   async function call(method, ...args) {
     try {
       const client = await getClient();
       if (typeof client[method] !== 'function') throw new JournalClientError(`Unknown Journal client method: ${method}`, { code:'journal_method_invalid', category:'validation' });
       return await client[method](...args);
+    } catch (err) {
+      state.lastError = err?.message || String(err);
+      throw err;
+    }
+  }
+
+  async function mediaCall(method, entryId, payload = {}) {
+    try {
+      const client = await getMediaClient();
+      const workspaceId = await ensureWorkspace();
+      if (typeof client[method] !== 'function') throw new JournalClientError(`Unknown Journal media method: ${method}`, { code:'journal_media_method_invalid', category:'validation' });
+      return await client[method]({ workspaceId, entryId, ...payload });
     } catch (err) {
       state.lastError = err?.message || String(err);
       throw err;
@@ -172,7 +201,15 @@ export function createBrowserJournalBinding({
     deleteBlock:(entryId, input, opts) => call('deleteBlock', entryId, input, opts),
     restoreBlock:(entryId, input, opts) => call('restoreBlock', entryId, input, opts),
     listEntries:(opts) => call('listEntries', opts),
-    getEntry:(id, opts) => call('getEntry', id, opts)
+    getEntry:(id, opts) => call('getEntry', id, opts),
+    uploadPhoto:(entryId, file, opts = {}) => mediaCall('uploadPhoto', entryId, { file, ...opts }),
+    updateMedia:(entryId, mediaId, expectedVersion, patch, opts = {}) => mediaCall('update', entryId, { mediaId, expectedVersion, patch, mutationId:opts.mutationId }),
+    archiveMedia:(entryId, mediaId, expectedVersion, opts = {}) => mediaCall('archive', entryId, { mediaId, expectedVersion, mutationId:opts.mutationId }),
+    restoreMedia:(entryId, mediaId, expectedVersion, opts = {}) => mediaCall('restore', entryId, { mediaId, expectedVersion, mutationId:opts.mutationId }),
+    mediaSignedUrl:async(storagePath, expiresIn = 900) => {
+      const client = await getMediaClient();
+      return client.signedUrl({ storagePath, expiresIn });
+    }
   };
   return Object.freeze(api);
 }
