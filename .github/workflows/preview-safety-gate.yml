@@ -65,9 +65,10 @@ jobs:
           mkdir stress-times
 
           run_session() {
+            set -euo pipefail
             sid="$1"
             started=$(date +%s%3N)
-            curl --fail --silent --show-error --location \
+            curl --fail --fail-early --silent --show-error --location \
               --connect-timeout 5 --max-time 30 \
               -A 'FamilyTripPreviewSafetyGate/1.0' \
               -o /dev/null "$base/" \
@@ -81,7 +82,7 @@ jobs:
           export -f run_session
           export base
 
-          seq 1 25 | xargs -I{} -P5 bash -c 'run_session "$1"' _ {}
+          seq 1 25 | xargs -I{} -P5 bash -c 'set -euo pipefail; run_session "$1"' _ {}
 
           python3 - <<'PY'
           from pathlib import Path
