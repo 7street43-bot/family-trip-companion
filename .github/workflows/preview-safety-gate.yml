@@ -22,18 +22,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify runtime files are unchanged from main
+      - name: Enforce preview change policy
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main --depth=1
-          forbidden_changes=$(git diff --name-only origin/main...HEAD -- \
-            public/app.js public/app.css public/index.html public/db.js public/cloud-sync.js public/sw.js public/manifest.webmanifest public/version.json netlify netlify.toml supabase || true)
-          if [ -n "$forbidden_changes" ]; then
-            echo "Runtime or backend files changed unexpectedly:"
-            echo "$forbidden_changes"
-            exit 1
+          git fetch origin main --depth=100
+          runtime_changes=$(git diff --name-only origin/main...HEAD -- public netlify/functions || true)
+          backend_changes=$(git diff --name-only origin/main...HEAD -- netlify/functions || true)
+          protected_changes=$(git diff --name-only origin/main...HEAD -- supabase netlify.toml scripts/netlify-deploy-guard.mjs .github/workflows .env.example || true)
+          messages=$(git log --format=%B origin/main..HEAD || true)
+
+          if [ -n "$runtime_changes" ]; then
+            git diff --name-only origin/main...HEAD -- public/version.json | grep -q '^public/version.json$' || {
+              echo 'Runtime changed but public/version.json was not updated. Version identity is required for preview verification.'
+              exit 1
+            }
           fi
+
+          if [ -n "$backend_changes" ]; then
+            printf '%s' "$messages" | grep -Fq '[backend-approved]' || {
+              echo 'Backend files changed without [backend-approved] in the preview commit range.'
+              exit 1
+            }
+          fi
+
+          if [ -n "$protected_changes" ]; then
+            printf '%s' "$messages" | grep -Fq '[governance-approved]' || {
+              echo 'Protected governance/data files changed without [governance-approved].'
+              echo "$protected_changes"
+              exit 1
+            }
+          fi
+
+          echo 'Preview change policy = PASS'
 
       - name: Static syntax and JSON checks
         shell: bash
@@ -48,68 +69,75 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('public/seed-data.json','utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('public/decision-metadata.json','utf8'))"
 
-      - name: Production runtime smoke check
+      - name: Verify production still matches main
         shell: bash
         run: |
           set -euo pipefail
-          base='https://comfy-heliotrope-475c71.netlify.app'
-          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 "$base/version.json" -o version-live.json
-          node -e "const v=require('./version-live.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
-          for p in / /manifest.webmanifest '/app.css?v=4.5.0-phase1.2' '/app.js?v=4.5.0-phase1.2'; do
-            code=$(curl --connect-timeout 10 --max-time 30 --silent --show-error --location --output /dev/null --write-out '%{http_code}' "$base$p")
-            test "$code" = "200" || { echo "$p -> $code"; exit 1; }
+          git fetch origin main --depth=1
+          git show origin/main:public/version.json > expected-main-version.json
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            'https://comfy-heliotrope-475c71.netlify.app/version.json' -o live-production-version.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const expected = JSON.parse(fs.readFileSync('expected-main-version.json','utf8')).version;
+          const live = JSON.parse(fs.readFileSync('live-production-version.json','utf8')).version;
+          if (expected !== live) {
+            console.error({expectedMain: expected, liveProduction: live});
+            process.exit(1);
+          }
+          console.log(`production matches main: ${live}`);
+          NODE
+          for p in / /manifest.webmanifest /app.css /app.js; do
+            code=$(curl --connect-timeout 10 --max-time 30 --silent --show-error --location --output /dev/null --write-out '%{http_code}' "https://comfy-heliotrope-475c71.netlify.app$p")
+            test "$code" = '200' || { echo "$p -> $code"; exit 1; }
           done
 
-      - name: Wait for preview branch deploy to become stable
+      - name: Wait for preview branch deploy to match candidate and become stable
         shell: bash
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          paths=(
-            '/'
-            '/version.json'
-            '/manifest.webmanifest'
-            '/app.css?v=4.5.0-phase1.2'
-            '/app.js?v=4.5.0-phase1.2'
-          )
-
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          paths=( '/' '/version.json' '/manifest.webmanifest' '/app.css' '/app.js' )
           consecutive=0
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 36); do
             sweep_ok=1
             for p in "${paths[@]}"; do
               if ! curl --fail --silent --show-error --location \
                 --connect-timeout 10 --max-time 30 \
                 --retry 1 --retry-all-errors --retry-delay 1 \
-                -o /tmp/preview-check "$base$p"; then
+                -o /dev/null "${base}${p}?preview_gate=${GITHUB_SHA}"; then
                 sweep_ok=0
                 break
               fi
             done
-
-            if [ "$sweep_ok" = "1" ]; then
+            if [ "$sweep_ok" = '1' ]; then
               if curl --fail --silent --show-error --location \
                 --connect-timeout 10 --max-time 30 \
                 --retry 1 --retry-all-errors --retry-delay 1 \
-                "$base/version.json" -o preview-version.json \
-                && node -e "const v=require('./preview-version.json'); process.exit(v.version==='4.5.0-phase1.2'?0:1)"; then
+                "${base}/version.json?preview_gate=${GITHUB_SHA}" -o preview-version.json \
+                && EXPECTED="$expected" node - <<'NODE'
+          const fs = require('fs');
+          const live = JSON.parse(fs.readFileSync('preview-version.json','utf8')).version;
+          if (live !== process.env.EXPECTED) process.exit(1);
+          NODE
+              then
                 consecutive=$((consecutive+1))
-                echo "stable sweep $consecutive/3"
+                echo "stable sweep ${consecutive}/3"
               else
                 consecutive=0
               fi
             else
               consecutive=0
             fi
-
             if [ "$consecutive" -ge 3 ]; then
-              echo 'Preview branch deploy is stable across 3 consecutive full-asset sweeps.'
+              echo 'Preview branch deploy matches candidate and is stable.'
               break
             fi
             sleep 5
           done
-
-          test "$consecutive" -ge 3 || { echo 'Preview branch deploy did not stabilize'; exit 1; }
-          sleep 5
+          test "$consecutive" -ge 3 || { echo 'Preview branch deploy did not stabilize on candidate version'; exit 1; }
+          sleep 3
 
       - name: Preview browser-like cold-load stress test
         shell: bash
@@ -118,7 +146,6 @@ jobs:
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
           rm -rf stress-times
           mkdir stress-times
-
           run_session() {
             set -euo pipefail
             sid="$1"
@@ -126,24 +153,21 @@ jobs:
             curl --fail --fail-early --silent --show-error --location \
               --connect-timeout 10 --max-time 30 \
               --retry 2 --retry-all-errors --retry-delay 1 \
-              -A 'FamilyTripPreviewSafetyGate/1.1' \
-              -o /dev/null "$base/" \
-              -o /dev/null "$base/version.json" \
-              -o /dev/null "$base/manifest.webmanifest" \
-              -o /dev/null "$base/app.css?v=4.5.0-phase1.2" \
-              -o /dev/null "$base/app.js?v=4.5.0-phase1.2"
+              -A 'FamilyTripPreviewSafetyGate/2.0' \
+              -o /dev/null "$base/?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/version.json?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/manifest.webmanifest?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.css?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.js?gate=$GITHUB_SHA"
             ended=$(date +%s%3N)
             echo $((ended-started)) > "stress-times/$sid.ms"
           }
           export -f run_session
-          export base
-
+          export base GITHUB_SHA
           seq 1 25 | xargs -I{} -P5 bash -c 'set -euo pipefail; run_session "$1"' _ {}
-
           python3 - <<'PY'
           from pathlib import Path
           import statistics
-
           vals = sorted(int(p.read_text().strip()) for p in Path('stress-times').glob('*.ms'))
           if len(vals) != 25:
               raise SystemExit(f'session-count-mismatch:{len(vals)}')
@@ -151,10 +175,8 @@ jobs:
           p95 = vals[max(0, int(len(vals) * 0.95) - 1)]
           maxv = max(vals)
           print(f'sessions=25 concurrency=5 p50_ms={p50:.0f} p95_ms={p95} max_ms={maxv}')
-          if p95 > 10000:
-              raise SystemExit(f'p95-session-too-slow:{p95}ms')
-          if maxv > 15000:
-              raise SystemExit(f'max-session-too-slow:{maxv}ms')
+          if p95 > 10000: raise SystemExit(f'p95-session-too-slow:{p95}ms')
+          if maxv > 15000: raise SystemExit(f'max-session-too-slow:{maxv}ms')
           PY
 
       - name: Production runtime recheck
@@ -162,9 +184,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base='https://comfy-heliotrope-475c71.netlify.app'
-          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 "$base/version.json" -o version-live-after.json
-          node -e "const v=require('./version-live-after.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
+          git fetch origin main --depth=1
+          git show origin/main:public/version.json > expected-main-version-after.json
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            'https://comfy-heliotrope-475c71.netlify.app/version.json' -o live-production-after.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const expected = JSON.parse(fs.readFileSync('expected-main-version-after.json','utf8')).version;
+          const live = JSON.parse(fs.readFileSync('live-production-after.json','utf8')).version;
+          if (expected !== live) process.exit(1);
+          NODE
 
       - name: Gate result
         run: echo 'PREVIEW FIXED BRANCH DEPLOY + LOAD GATE = PASS'
