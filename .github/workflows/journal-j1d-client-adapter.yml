@@ -1,0 +1,40 @@
+name: Journal J1D Client Adapter
+
+on:
+  push:
+    branches: [preview]
+    paths:
+      - 'shared/journal-client.mjs'
+      - 'shared/journal-supabase-transport.mjs'
+      - 'tests/journal-client-adapter.test.mjs'
+      - 'tests/journal-client-adapter-stress.mjs'
+      - '.github/workflows/journal-j1d-client-adapter.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: journal-j1d-client-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  adapter-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Node version
+        run: node --version
+      - name: Static module checks
+        run: |
+          node --check shared/journal-client.mjs
+          node --check shared/journal-supabase-transport.mjs
+          node --check tests/journal-client-adapter.test.mjs
+          node --check tests/journal-client-adapter-stress.mjs
+      - name: Contract tests
+        run: node --test tests/journal-client-adapter.test.mjs
+      - name: Client adapter stress
+        run: node tests/journal-client-adapter-stress.mjs
+      - name: Result
+        run: echo 'J1D SHARED CLIENT ADAPTER + ERROR/CONFLICT GATE = PASS'

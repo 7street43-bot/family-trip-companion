@@ -1,0 +1,98 @@
+name: Journal J1E Adapter Integration
+
+on:
+  push:
+    branches: [preview]
+    paths:
+      - 'shared/journal-*.mjs'
+      - 'public/journal-browser.mjs'
+      - 'public/version.json'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'netlify/functions/journal-gpt.mjs'
+      - 'scripts/prepare-site.mjs'
+      - 'netlify.toml'
+      - 'tests/journal-*.mjs'
+      - '.github/workflows/journal-j1e-adapter-integration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: journal-j1e-adapter-integration
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare static Journal modules
+        run: node scripts/prepare-site.mjs
+      - name: Verify canonical module parity
+        run: |
+          cmp shared/journal-client.mjs public/lib/journal-client.mjs
+          cmp shared/journal-supabase-transport.mjs public/lib/journal-supabase-transport.mjs
+      - name: Static checks
+        run: |
+          node --check shared/journal-client.mjs
+          node --check shared/journal-supabase-transport.mjs
+          node --check public/journal-browser.mjs
+          node --check netlify/functions/journal-gpt.mjs
+          node --check tests/journal-browser-binding.test.mjs
+          node --check tests/journal-gpt-gateway.test.mjs
+      - name: Adapter and integration tests
+        run: |
+          node --test tests/journal-client-adapter.test.mjs tests/journal-browser-binding.test.mjs tests/journal-gpt-gateway.test.mjs
+          node tests/journal-client-adapter-stress.mjs
+      - name: Security invariants
+        run: |
+          ! grep -R "SERVICE_ROLE\|service_role" -n netlify/functions/journal-gpt.mjs public/journal-browser.mjs
+          grep -F "source:'gpt'" netlify/functions/journal-gpt.mjs
+          grep -F "journal_origin_mismatch" public/journal-browser.mjs
+          grep -F "invalid_or_expired_token" netlify/functions/journal-gpt.mjs
+          grep -F "journal_idempotency_required" netlify/functions/journal-gpt.mjs
+      - name: Result
+        run: echo 'J1E ADAPTER INTEGRATION CONTRACT = PASS'
+
+  preview-smoke:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for fixed Preview deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          ok=0
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 1 --retry-all-errors --retry-delay 1 \
+              "$base/version.json?j1e=${GITHUB_SHA}" -o /tmp/version.json; then
+              live=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/tmp/version.json','utf8')).version)")
+              if [ "$live" = "$expected" ]; then ok=1; break; fi
+            fi
+            sleep 5
+          done
+          test "$ok" = 1 || { echo 'J1E Preview deploy did not reach expected version'; exit 1; }
+      - name: Browser module delivery smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          for p in /journal-browser.mjs /lib/journal-client.mjs /lib/journal-supabase-transport.mjs; do
+            code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1e=$GITHUB_SHA")
+            test "$code" = 200 || { echo "$p -> $code"; exit 1; }
+          done
+      - name: GPT gateway fail-closed smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://preview--comfy-heliotrope-475c71.netlify.app/api/journal-gpt'
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /tmp/noauth.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"command":"listEntries"}' "$url")
+          test "$code" = 401 || { cat /tmp/noauth.json; echo "no-auth -> $code"; exit 1; }
+          grep -Fq 'missing_bearer_token' /tmp/noauth.json
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /tmp/badjwt.json -w '%{http_code}' -X POST -H 'content-type: application/json' -H 'authorization: Bearer invalid-j1e-token' --data '{"command":"listEntries"}' "$url")
+          test "$code" = 401 || { cat /tmp/badjwt.json; echo "bad-jwt -> $code"; exit 1; }
+          grep -Fq 'invalid_or_expired_token' /tmp/badjwt.json
+      - name: Result
+        run: echo 'J1E PREVIEW BROWSER + GPT AUTH GATE = PASS'

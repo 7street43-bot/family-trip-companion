@@ -1,4 +1,5 @@
 [build]
+  command = "node ./scripts/prepare-site.mjs"
   publish = "public"
   ignore = "node ./scripts/netlify-deploy-guard.mjs"
 

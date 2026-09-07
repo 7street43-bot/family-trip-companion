@@ -1,0 +1,193 @@
+name: Journal J1C Draft Stress
+
+on:
+  push:
+    branches: [preview]
+    paths:
+      - 'docs/JOURNAL_J1B_SCHEMA_DRAFT.sql'
+      - 'docs/JOURNAL_J1C_MUTATION_DRAFT.sql'
+      - 'tests/journal-j1c-bootstrap.sql'
+      - 'tests/journal-j1c-stress.sql'
+      - '.github/workflows/journal-j1c-draft-stress.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: journal-j1c-draft-stress
+  cancel-in-progress: true
+
+jobs:
+  postgres-contract-stress:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: journal_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d journal_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: postgres
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: journal_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure psql client
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+          psql --version
+
+      - name: Bootstrap Supabase-like auth/workspace primitives
+        run: psql -v ON_ERROR_STOP=1 -f tests/journal-j1c-bootstrap.sql
+
+      - name: Apply J1B into disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f docs/JOURNAL_J1B_SCHEMA_DRAFT.sql
+
+      - name: Apply J1C Draft into disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f docs/JOURNAL_J1C_MUTATION_DRAFT.sql
+
+      - name: Contract, ACL, lifecycle and negative tests
+        run: psql -v ON_ERROR_STOP=1 -f tests/journal-j1c-stress.sql
+
+      - name: 1000 optimistic-lock attempts
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set role authenticated;
+          select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
+          do $$
+          declare i int; j int; r jsonb; eid uuid; applied int; conflicted int;
+          begin
+            for i in 1..100 loop
+              r:=public.journal_create(
+                'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','2026-09-07',gen_random_uuid(),'mobile',
+                'Asia/Taipei','race-'||i,null,'{}','{}',null
+              );
+              eid:=(r->>'targetId')::uuid;
+              applied:=0; conflicted:=0;
+              for j in 1..10 loop
+                r:=public.journal_update(
+                  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',eid,1,
+                  jsonb_build_object('title','writer-'||j),'mobile',gen_random_uuid()
+                );
+                if r->>'status'='applied' then applied:=applied+1; else conflicted:=conflicted+1; end if;
+              end loop;
+              if applied<>1 or conflicted<>9 then
+                raise exception 'race invariant failed: entry %, applied %, conflicted %',i,applied,conflicted;
+              end if;
+            end loop;
+          end$$;
+          reset role;
+          SQL
+          echo '1000 optimistic-lock attempts = PASS'
+
+      - name: Real 50-writer concurrency race
+        run: |
+          set -euo pipefail
+          eid=$(psql -X -qAt <<'SQL' | tail -n1
+          set role authenticated;
+          select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
+          select public.journal_create(
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','2026-09-07',gen_random_uuid(),'mobile',
+            'Asia/Taipei','concurrent-stale',null,'{}','{}',null
+          )->>'targetId';
+          SQL
+          )
+          export eid
+          rm -f /tmp/j1c-race-*.out
+          seq 1 50 | xargs -I{} -P20 bash -c '
+            writer="$1"
+            psql -X -qAt -v eid="$eid" -v writer="$writer" <<SQL > /tmp/j1c-race-$writer.out
+          set role authenticated;
+          select set_config('"'"'request.jwt.claim.sub'"'"','"'"'11111111-1111-1111-1111-111111111111'"'"',false);
+          select public.journal_update(
+            '"'"'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'"'"', :'"'"'eid'"'"'::uuid, 1,
+            jsonb_build_object('"'"'title'"'"','"'"'writer-'"'"'||:'"'"'writer'"'"'),
+            '"'"'mobile'"'"', gen_random_uuid()
+          );
+          SQL
+          ' _ {}
+          applied=$(grep -h -c '"status": "applied"' /tmp/j1c-race-*.out | awk '{s+=$1} END{print s+0}')
+          conflicted=$(grep -h -c '"status": "conflict"' /tmp/j1c-race-*.out | awk '{s+=$1} END{print s+0}')
+          test "$applied" -eq 1
+          test "$conflicted" -eq 49
+          echo "50-writer stale race: applied=$applied conflict=$conflicted"
+
+      - name: Real 20-request duplicate mutation race
+        run: |
+          set -euo pipefail
+          eid=$(psql -X -qAt <<'SQL' | tail -n1
+          set role authenticated;
+          select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
+          select public.journal_create(
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','2026-09-07',gen_random_uuid(),'mobile',
+            'Asia/Taipei','concurrent-idempotent',null,'{}','{}',null
+          )->>'targetId';
+          SQL
+          )
+          export eid
+          mid='dddddddd-dddd-dddd-dddd-dddddddddddd'
+          export mid
+          rm -f /tmp/j1c-idem-*.out
+          seq 1 20 | xargs -I{} -P20 bash -c '
+            n="$1"
+            psql -X -qAt -v eid="$eid" -v mid="$mid" <<SQL > /tmp/j1c-idem-$n.out
+          set role authenticated;
+          select set_config('"'"'request.jwt.claim.sub'"'"','"'"'11111111-1111-1111-1111-111111111111'"'"',false);
+          select public.journal_update(
+            '"'"'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'"'"', :'"'"'eid'"'"'::uuid, 1,
+            '"'"'{"title":"same mutation"}'"'"'::jsonb,
+            '"'"'mobile'"'"', :'"'"'mid'"'"'::uuid
+          );
+          SQL
+          ' _ {}
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          from collections import Counter
+          statuses=[]
+          parse_errors=[]
+          for p in sorted(Path('/tmp').glob('j1c-idem-*.out')):
+              objs=[]
+              for line in p.read_text().splitlines():
+                  line=line.strip()
+                  if not line.startswith('{'):
+                      continue
+                  try:
+                      objs.append(json.loads(line))
+                  except Exception as e:
+                      parse_errors.append((p.name,line,str(e)))
+              if objs:
+                  statuses.append(objs[-1].get('status','missing'))
+              else:
+                  statuses.append('no_json')
+          counts=Counter(statuses)
+          print('duplicate-race status counts:',dict(counts))
+          if parse_errors:
+              print('parse errors:',parse_errors[:3])
+          if counts['applied'] != 1 or counts['replayed'] != 19 or counts['conflict'] != 0 or len(statuses) != 20:
+              raise SystemExit('duplicate mutation response invariant failed')
+          PY
+          psql -X -qAt -v eid="$eid" -v mid="$mid" <<'SQL'
+          select 'entry_version='||version from public.journal_entries where id=:'eid'::uuid;
+          select 'mutation_revisions='||count(*) from public.journal_revisions where mutation_id=:'mid'::uuid;
+          SQL
+          echo '20-request duplicate mutation race = PASS'
+
+      - name: Result
+        run: echo 'J1C DRAFT POSTGRES SECURITY + CONCURRENCY STRESS = PASS'
