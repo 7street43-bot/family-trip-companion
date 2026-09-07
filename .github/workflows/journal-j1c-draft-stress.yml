@@ -156,13 +156,38 @@ jobs:
           );
           SQL
           ' _ {}
-          applied=$(grep -h -c '"status": "applied"' /tmp/j1c-idem-*.out | awk '{s+=$1} END{print s+0}')
-          replayed=$(grep -h -c '"status": "replayed"' /tmp/j1c-idem-*.out | awk '{s+=$1} END{print s+0}')
-          conflicted=$(grep -h -c '"status": "conflict"' /tmp/j1c-idem-*.out | awk '{s+=$1} END{print s+0}')
-          test "$applied" -eq 1
-          test "$replayed" -eq 19
-          test "$conflicted" -eq 0
-          echo "20-request duplicate mutation: applied=$applied replayed=$replayed conflict=$conflicted"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          from collections import Counter
+          statuses=[]
+          parse_errors=[]
+          for p in sorted(Path('/tmp').glob('j1c-idem-*.out')):
+              objs=[]
+              for line in p.read_text().splitlines():
+                  line=line.strip()
+                  if not line.startswith('{'):
+                      continue
+                  try:
+                      objs.append(json.loads(line))
+                  except Exception as e:
+                      parse_errors.append((p.name,line,str(e)))
+              if objs:
+                  statuses.append(objs[-1].get('status','missing'))
+              else:
+                  statuses.append('no_json')
+          counts=Counter(statuses)
+          print('duplicate-race status counts:',dict(counts))
+          if parse_errors:
+              print('parse errors:',parse_errors[:3])
+          if counts['applied'] != 1 or counts['replayed'] != 19 or counts['conflict'] != 0 or len(statuses) != 20:
+              raise SystemExit('duplicate mutation response invariant failed')
+          PY
+          psql -X -qAt -v eid="$eid" -v mid="$mid" <<'SQL'
+          select 'entry_version='||version from public.journal_entries where id=:'eid'::uuid;
+          select 'mutation_revisions='||count(*) from public.journal_revisions where mutation_id=:'mid'::uuid;
+          SQL
+          echo '20-request duplicate mutation race = PASS'
 
       - name: Result
         run: echo 'J1C DRAFT POSTGRES SECURITY + CONCURRENCY STRESS = PASS'
