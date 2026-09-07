@@ -56,11 +56,28 @@ jobs:
             test "$code" = "200" || { echo "$p -> $code"; exit 1; }
           done
 
-      - name: Browser-like cold-load stress test
+      - name: Wait for fixed preview branch deploy
         shell: bash
         run: |
           set -euo pipefail
-          base='https://comfy-heliotrope-475c71.netlify.app'
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          ok=0
+          for i in $(seq 1 24); do
+            if curl --fail --silent --show-error --location --connect-timeout 5 --max-time 20 "$base/version.json" -o preview-version.json; then
+              if node -e "const v=require('./preview-version.json'); process.exit(v.version==='4.5.0-phase1.2'?0:1)"; then
+                ok=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+          test "$ok" = "1" || { echo 'Preview branch deploy not reachable or runtime mismatch'; exit 1; }
+
+      - name: Preview browser-like cold-load stress test
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
           rm -rf stress-times
           mkdir stress-times
 
@@ -101,5 +118,13 @@ jobs:
               raise SystemExit(f'max-session-too-slow:{maxv}ms')
           PY
 
+      - name: Production runtime recheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://comfy-heliotrope-475c71.netlify.app'
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 30 "$base/version.json" -o version-live-after.json
+          node -e "const v=require('./version-live-after.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
+
       - name: Gate result
-        run: echo 'PREVIEW SAFETY BROWSER-LIKE LOAD GATE = PASS'
+        run: echo 'PREVIEW FIXED BRANCH DEPLOY + LOAD GATE = PASS'
