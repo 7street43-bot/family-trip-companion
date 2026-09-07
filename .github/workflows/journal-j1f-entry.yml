@@ -42,9 +42,12 @@ jobs:
           grep -Fq 'journal.css' public/index.html
           grep -Fq "QUEUE_KEY='journalJ1FQueue'" public/journal-ui.mjs
           grep -Fq 'Preview 安全模式不會寫入或排入正式日誌' public/journal-ui.mjs
+          grep -Fq 'data-journal-archived' public/journal-ui.mjs
+          grep -Fq 'includeArchived' public/journal-ui.mjs
+          grep -Fq 'journal-archived-badge' public/journal-ui.mjs
           grep -Fq "source:'gpt'" netlify/functions/journal-gpt.mjs
           ! grep -R "SERVICE_ROLE\|service_role" -n public/journal-ui.mjs public/journal-browser.mjs netlify/functions/journal-gpt.mjs
-          node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(v.version!=='4.5.0-phase1.4-j1f') process.exit(1)"
+          node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(v.version!=='4.5.0-phase1.4-j1f.1') process.exit(1)"
       - name: Result
         run: echo 'J1F MOBILE + DESKTOP + GPT CONTRACT = PASS'
 

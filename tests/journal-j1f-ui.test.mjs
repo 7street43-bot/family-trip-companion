@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitCsv, todayLocal, entryLabel, queueRecord } from '../public/journal-ui.mjs';
+import { splitCsv, todayLocal, entryLabel, queueRecord, listOptions } from '../public/journal-ui.mjs';
 
 test('splitCsv trims, deduplicates and accepts Chinese comma',()=>{
   assert.deepEqual(splitCsv('六福村, 第一次，六福村, 雙寶'),['六福村','第一次','雙寶']);
@@ -26,4 +26,9 @@ test('queueRecord preserves mutation id and normalized write payload',()=>{
   assert.equal(q.input.timezone,'Asia/Taipei');
   assert.deepEqual(q.input.tags,['A']);
   assert.deepEqual(q.input.participants,['B']);
+});
+
+test('listOptions keeps archived entries hidden by default and opt-in visible',()=>{
+  assert.deepEqual(listOptions(false),{limit:100,includeArchived:false});
+  assert.deepEqual(listOptions(true),{limit:100,includeArchived:true});
 });
