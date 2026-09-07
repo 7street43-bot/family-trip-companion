@@ -1,5 +1,5 @@
 const PREVIEW_HOST='preview--comfy-heliotrope-475c71.netlify.app';
-const VERSION='4.5.0-phase1.6-j1g.2';
+const VERSION='4.5.0-phase1.6-j1g.3';
 const ACCEPTED=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
 const MAX_BYTES=25*1024*1024;
 const MAX_FILES=20;
@@ -14,7 +14,7 @@ function revokeAll(){for(const item of state.items){try{URL.revokeObjectURL(item
 function root(){return document.getElementById('journalPreviewMediaDemo');}
 function syncHeaderVersion(){const small=document.querySelector('#journalOverlay .journal-head-copy small');if(!small)return;const prefix=String(small.textContent||'').split('｜')[0]||'手機紀錄與回顧';small.textContent=`${prefix}｜${VERSION}`;}
 function render(){const el=root();if(!el)return;const cards=state.items.length?`<div class="journal-media-grid">${state.items.map((item,i)=>`<article class="journal-media-card"><div class="journal-media-photo"><img src="${esc(item.url)}" alt="Preview 本機照片 ${i+1}"></div><div class="journal-media-meta"><small>${esc(item.name)}｜${Math.max(1,Math.round(item.size/1024))} KB</small><label>照片說明（僅本機預覽）<input type="text" maxlength="300" placeholder="例如：第一次餵長頸鹿"></label></div></article>`).join('')}</div>`:'<div class="journal-media-empty">尚未載入照片。可直接從 iPhone 相簿選取多張。</div>';
-el.innerHTML=`<div class="journal-media-head"><div><h4>Preview 相簿實機驗收</h4><small>J1G.2｜純本機、不碰雲端</small></div>${state.items.length?'<button type="button" class="journal-filter-btn" data-preview-media-clear>清除</button>':''}</div><div class="journal-media-message">${previewSafetyCopy()}</div><div class="journal-media-upload"><label>從 iPhone 選照片<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" multiple data-preview-media-files></label><small>最多 20 張；每張最多 25MB。選取後立即產生本機縮圖。</small></div>${cards}`;}
+el.innerHTML=`<div class="journal-media-head"><div><h4>Preview 相簿實機驗收</h4><small>J1G.3｜純本機、不碰雲端</small></div>${state.items.length?'<button type="button" class="journal-filter-btn" data-preview-media-clear>清除</button>':''}</div><div class="journal-media-message">${previewSafetyCopy()}</div><div class="journal-media-upload"><label>從 iPhone 選照片<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" multiple data-preview-media-files></label><small>最多 20 張；每張最多 25MB。選取後立即產生本機縮圖。</small></div>${cards}`;}
 
 function ensureDemo(){if(!isFixedPreview()||document.getElementById('journalOverlay')?.hidden)return;syncHeaderVersion();const left=document.querySelector('#journalOverlay .journal-left');if(!left)return;if(root())return;const el=document.createElement('section');el.id='journalPreviewMediaDemo';el.className='journal-media-section journal-preview-media-demo';const anchor=left.querySelector('.journal-alert');if(anchor)anchor.insertAdjacentElement('afterend',el);else left.prepend(el);render();}
 function clearDemo(){revokeAll();root()?.remove();}
