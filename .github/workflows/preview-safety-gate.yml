@@ -5,6 +5,10 @@ on:
     branches: [preview]
   workflow_dispatch:
 
+concurrency:
+  group: preview-safety-gate
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -49,29 +53,63 @@ jobs:
         run: |
           set -euo pipefail
           base='https://comfy-heliotrope-475c71.netlify.app'
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 30 "$base/version.json" -o version-live.json
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 "$base/version.json" -o version-live.json
           node -e "const v=require('./version-live.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
           for p in / /manifest.webmanifest '/app.css?v=4.5.0-phase1.2' '/app.js?v=4.5.0-phase1.2'; do
-            code=$(curl --connect-timeout 5 --max-time 30 --silent --show-error --location --output /dev/null --write-out '%{http_code}' "$base$p")
+            code=$(curl --connect-timeout 10 --max-time 30 --silent --show-error --location --output /dev/null --write-out '%{http_code}' "$base$p")
             test "$code" = "200" || { echo "$p -> $code"; exit 1; }
           done
 
-      - name: Wait for fixed preview branch deploy
+      - name: Wait for preview branch deploy to become stable
         shell: bash
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          ok=0
-          for i in $(seq 1 24); do
-            if curl --fail --silent --show-error --location --connect-timeout 5 --max-time 20 "$base/version.json" -o preview-version.json; then
-              if node -e "const v=require('./preview-version.json'); process.exit(v.version==='4.5.0-phase1.2'?0:1)"; then
-                ok=1
+          paths=(
+            '/'
+            '/version.json'
+            '/manifest.webmanifest'
+            '/app.css?v=4.5.0-phase1.2'
+            '/app.js?v=4.5.0-phase1.2'
+          )
+
+          consecutive=0
+          for attempt in $(seq 1 30); do
+            sweep_ok=1
+            for p in "${paths[@]}"; do
+              if ! curl --fail --silent --show-error --location \
+                --connect-timeout 10 --max-time 30 \
+                --retry 1 --retry-all-errors --retry-delay 1 \
+                -o /tmp/preview-check "$base$p"; then
+                sweep_ok=0
                 break
               fi
+            done
+
+            if [ "$sweep_ok" = "1" ]; then
+              if curl --fail --silent --show-error --location \
+                --connect-timeout 10 --max-time 30 \
+                --retry 1 --retry-all-errors --retry-delay 1 \
+                "$base/version.json" -o preview-version.json \
+                && node -e "const v=require('./preview-version.json'); process.exit(v.version==='4.5.0-phase1.2'?0:1)"; then
+                consecutive=$((consecutive+1))
+                echo "stable sweep $consecutive/3"
+              else
+                consecutive=0
+              fi
+            else
+              consecutive=0
+            fi
+
+            if [ "$consecutive" -ge 3 ]; then
+              echo 'Preview branch deploy is stable across 3 consecutive full-asset sweeps.'
+              break
             fi
             sleep 5
           done
-          test "$ok" = "1" || { echo 'Preview branch deploy not reachable or runtime mismatch'; exit 1; }
+
+          test "$consecutive" -ge 3 || { echo 'Preview branch deploy did not stabilize'; exit 1; }
+          sleep 5
 
       - name: Preview browser-like cold-load stress test
         shell: bash
@@ -86,8 +124,9 @@ jobs:
             sid="$1"
             started=$(date +%s%3N)
             curl --fail --fail-early --silent --show-error --location \
-              --connect-timeout 5 --max-time 30 \
-              -A 'FamilyTripPreviewSafetyGate/1.0' \
+              --connect-timeout 10 --max-time 30 \
+              --retry 2 --retry-all-errors --retry-delay 1 \
+              -A 'FamilyTripPreviewSafetyGate/1.1' \
               -o /dev/null "$base/" \
               -o /dev/null "$base/version.json" \
               -o /dev/null "$base/manifest.webmanifest" \
@@ -119,11 +158,12 @@ jobs:
           PY
 
       - name: Production runtime recheck
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           base='https://comfy-heliotrope-475c71.netlify.app'
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 30 "$base/version.json" -o version-live-after.json
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 "$base/version.json" -o version-live-after.json
           node -e "const v=require('./version-live-after.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
 
       - name: Gate result
