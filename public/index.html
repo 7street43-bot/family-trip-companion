@@ -7,15 +7,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="雙寶出遊" />
-  <meta name="description" content="雙寶出遊小幫手 4.5.0-phase1.6-j1g.3｜Family Trip Companion PWA" />
+  <meta name="description" content="雙寶出遊小幫手 4.5.0-phase1.6-j1g.4｜Family Trip Companion PWA" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./app.css?v=4.5.0-phase1.6-j1g.3" />
-  <link rel="stylesheet" href="./journal.css?v=4.5.0-phase1.6-j1g.3" />
-  <link rel="stylesheet" href="./journal-media.css?v=4.5.0-phase1.6-j1g.3" />
-  <link rel="stylesheet" href="./journal-nav.css?v=4.5.0-phase1.6-j1g.3" />
-  <title>雙寶出遊小幫手 4.5.0-phase1.6-j1g.3</title>
+  <link rel="stylesheet" href="./app.css?v=4.5.0-phase1.6-j1g.4" />
+  <link rel="stylesheet" href="./journal.css?v=4.5.0-phase1.6-j1g.4" />
+  <link rel="stylesheet" href="./journal-media.css?v=4.5.0-phase1.6-j1g.4" />
+  <link rel="stylesheet" href="./journal-nav.css?v=4.5.0-phase1.6-j1g.4" />
+  <title>雙寶出遊小幫手 4.5.0-phase1.6-j1g.4</title>
 </head>
 <body>
   <div id="app-shell">
@@ -24,7 +24,7 @@
         <div class="brand-mark" id="brandMark" aria-hidden="true">🐻</div>
         <div>
           <div class="brand-title" id="brandTitle">雙寶出遊</div>
-          <div class="brand-subtitle" id="brandSubtitle">家庭出遊小幫手 4.5.0-phase1.6-j1g.3</div>
+          <div class="brand-subtitle" id="brandSubtitle">家庭出遊小幫手 4.5.0-phase1.6-j1g.4</div>
         </div>
       </div>
       <button class="icon-btn" id="settingsBtn" aria-label="設定" title="設定">⚙︎</button>
@@ -36,7 +36,7 @@
       <button data-view="home" class="nav-item active" aria-label="首頁"><span>⌂</span><b>首頁</b></button>
       <button data-view="explore" class="nav-item" aria-label="探索"><span>⌕</span><b>探索</b></button>
       <button data-view="trips" class="nav-item" aria-label="行程"><span>▣</span><b>行程</b></button>
-      <button id="journalNavBtn" class="nav-item journal-nav-item" aria-label="日誌"><span>✎</span><b>日誌</b></button>
+      <button id="journalNavBtn" data-journal-nav class="nav-item journal-nav-item" aria-label="日誌"><span>✎</span><b>日誌</b></button>
       <button data-view="pack" class="nav-item" aria-label="外出包"><span>▢</span><b>外出包</b></button>
     </nav>
   </div>
@@ -45,13 +45,13 @@
   <div id="snackbar" class="snackbar" hidden></div>
   <input type="file" id="jsonImportInput" accept="application/json,.json" hidden />
 
-  <script src="./db.js?v=4.5.0-phase1.6-j1g.3"></script>
-  <script src="./cloud-sync.js?v=4.5.0-phase1.6-j1g.3"></script>
-  <script type="module" src="./journal-browser.mjs?v=4.5.0-phase1.6-j1g.3"></script>
-  <script type="module" src="./journal-ui.mjs?v=4.5.0-phase1.6-j1g.3"></script>
-  <script type="module" src="./journal-nav-bridge.mjs?v=4.5.0-phase1.6-j1g.3"></script>
-  <script type="module" src="./journal-media-ui.mjs?v=4.5.0-phase1.6-j1g.3"></script>
-  <script type="module" src="./journal-media-preview-demo.mjs?v=4.5.0-phase1.6-j1g.3"></script>
-  <script src="./app.js?v=4.5.0-phase1.6-j1g.3"></script>
+  <script src="./db.js?v=4.5.0-phase1.6-j1g.4"></script>
+  <script src="./cloud-sync.js?v=4.5.0-phase1.6-j1g.4"></script>
+  <script type="module" src="./journal-browser.mjs?v=4.5.0-phase1.6-j1g.4"></script>
+  <script type="module" src="./journal-ui.mjs?v=4.5.0-phase1.6-j1g.4"></script>
+  <script type="module" src="./journal-nav-bridge.mjs?v=4.5.0-phase1.6-j1g.4"></script>
+  <script type="module" src="./journal-media-ui.mjs?v=4.5.0-phase1.6-j1g.4"></script>
+  <script type="module" src="./journal-media-preview-demo.mjs?v=4.5.0-phase1.6-j1g.4"></script>
+  <script src="./app.js?v=4.5.0-phase1.6-j1g.4"></script>
 </body>
 </html>
