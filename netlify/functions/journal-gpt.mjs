@@ -23,7 +23,7 @@ function json(body, status=200) {
   }});
 }
 
-function config(env=process.env) {
+function getGatewayConfig(env=process.env) {
   const url=String(env.SUPABASE_URL||DEFAULT_URL).trim().replace(/\/$/,'');
   const publishableKey=String(env.SUPABASE_PUBLISHABLE_KEY||DEFAULT_PUBLISHABLE_KEY).trim();
   if(!/^https:\/\/.+\.supabase\.co$/i.test(url)||!/^sb_publishable_/i.test(publishableKey)) throw new Error('journal_gateway_not_configured');
@@ -169,7 +169,7 @@ export async function handleJournalGpt(req,{fetchImpl=globalThis.fetch?.bind(glo
   let body={};try{body=await req.json();}catch{return json({ok:false,error:'invalid_json'},400);}
   const command=String(body?.command||'');if(!COMMANDS.has(command)) return json({ok:false,error:'invalid_command'},400);
   try{
-    const {url:baseUrl,publishableKey}=config(env);
+    const {url:baseUrl,publishableKey}=getGatewayConfig(env);
     const user=await verifyUser({fetchImpl,baseUrl,publishableKey,token});
     if(!user) return json({ok:false,error:'invalid_or_expired_token'},401);
     const workspaceId=await ensureWorkspace({fetchImpl,baseUrl,publishableKey,token,body});
