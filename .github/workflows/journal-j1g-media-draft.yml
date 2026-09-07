@@ -8,7 +8,7 @@ on:
       - 'shared/journal-media-client.mjs'
       - 'shared/journal-media-supabase-transport.mjs'
       - 'tests/journal-j1g-media-client.test.mjs'
-      - 'tests/journal-j1g-postgres-harness.sql'
+      - 'tests/journal-j1g-postgres-harness-v2.sql'
       - '.github/workflows/journal-j1g-media-draft.yml'
   workflow_dispatch:
 
@@ -62,11 +62,11 @@ jobs:
           ! grep -Eiq 'public[[:space:]]*=[[:space:]]*true' "$sql"
           ! grep -R -E 'service_role|SERVICE_ROLE' shared/journal-media-*.mjs
 
-      - name: PostgreSQL serial Storage/RLS/RPC security harness
+      - name: PostgreSQL serial Storage/RLS/RPC security harness V2
         run: |
           set -euo pipefail
-          psql -X -v ON_ERROR_STOP=1 -f tests/journal-j1g-postgres-harness.sql | tee /tmp/j1g-serial.log
-          grep -Fq 'J1G SERIAL STORAGE + METADATA SECURITY = PASS' /tmp/j1g-serial.log
+          psql -X -v ON_ERROR_STOP=1 -f tests/journal-j1g-postgres-harness-v2.sql | tee /tmp/j1g-serial.log
+          grep -Fq 'J1G SERIAL STORAGE + METADATA SECURITY V2 = PASS' /tmp/j1g-serial.log
 
       - name: 40-way same-mutation reservation concurrency
         run: |
