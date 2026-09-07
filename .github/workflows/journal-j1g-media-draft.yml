@@ -1,0 +1,96 @@
+name: Journal J1G Media Draft Security
+
+on:
+  push:
+    branches: [preview]
+    paths:
+      - 'docs/JOURNAL_J1G_MEDIA_DRAFT.sql'
+      - 'shared/journal-media-client.mjs'
+      - 'shared/journal-media-supabase-transport.mjs'
+      - 'tests/journal-j1g-media-client.test.mjs'
+      - 'tests/journal-j1g-postgres-harness.sql'
+      - '.github/workflows/journal-j1g-media-draft.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: journal-j1g-media-draft
+  cancel-in-progress: true
+
+jobs:
+  security-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: journal_j1g
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d journal_j1g"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: journal_j1g
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Node syntax and media adapter contract
+        run: |
+          set -euo pipefail
+          node --check shared/journal-media-client.mjs
+          node --check shared/journal-media-supabase-transport.mjs
+          node --test tests/journal-j1g-media-client.test.mjs
+
+      - name: Fail-closed static invariants
+        run: |
+          set -euo pipefail
+          sql='docs/JOURNAL_J1G_MEDIA_DRAFT.sql'
+          grep -Fq "'journal-media','journal-media',false" "$sql"
+          grep -Fq "upload_state in ('pending','ready')" "$sql"
+          grep -Fq 'journal media reserver can upload object' "$sql"
+          grep -Fq 'journal media members can read objects' "$sql"
+          grep -Fq 'revoke insert,update,delete,truncate on public.journal_media from anon,authenticated' "$sql"
+          grep -Fq 'Intentionally no authenticated UPDATE/DELETE policies on storage.objects' "$sql"
+          ! grep -Eiq 'create policy .*storage\.objects for (update|delete)' "$sql"
+          ! grep -Eiq 'public[[:space:]]*=[[:space:]]*true' "$sql"
+          ! grep -R -E 'service_role|SERVICE_ROLE' shared/journal-media-*.mjs
+
+      - name: PostgreSQL serial Storage/RLS/RPC security harness
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f tests/journal-j1g-postgres-harness.sql | tee /tmp/j1g-serial.log
+          grep -Fq 'J1G SERIAL STORAGE + METADATA SECURITY = PASS' /tmp/j1g-serial.log
+
+      - name: 40-way same-mutation reservation concurrency
+        run: |
+          set -euo pipefail
+          W='11111111-1111-4111-8111-111111111111'
+          E='33333333-3333-4333-8333-333333333333'
+          M='cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+          MU='dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+          U='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+          PATHX="$W/$E/$M/$M.jpg"
+          rm -f /tmp/j1g-concurrency.txt
+          for i in $(seq 1 40); do
+            (
+              psql -X -qAt -v ON_ERROR_STOP=1 -c "set role authenticated; set request.jwt.claim.sub='$U'; select public.journal_media_mutate('reserve','$W','$E','$M',0,jsonb_build_object('storage_path','$PATHX','mime_type','image/jpeg'),'mobile','$MU')->>'status';" \
+                >> /tmp/j1g-concurrency.txt
+            ) &
+          done
+          wait
+          sort /tmp/j1g-concurrency.txt | uniq -c | tee /tmp/j1g-counts.txt
+          test "$(grep -c '^applied$' /tmp/j1g-concurrency.txt)" -eq 1
+          test "$(grep -c '^replayed$' /tmp/j1g-concurrency.txt)" -eq 39
+          test "$(psql -X -qAt -c "select count(*) from public.journal_media where id='$M'")" -eq 1
+          test "$(psql -X -qAt -c "select count(*) from public.journal_revisions where workspace_id='$W' and mutation_id='$MU'")" -eq 1
+          echo 'J1G 40-WAY RESERVE IDEMPOTENCY = PASS'
+
+      - name: Final result
+        run: echo 'J1G PRIVATE MEDIA STORAGE + METADATA MUTATION SECURITY GATE = PASS'
