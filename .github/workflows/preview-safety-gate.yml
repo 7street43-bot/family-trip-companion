@@ -1,0 +1,87 @@
+name: Preview Safety Gate
+
+on:
+  push:
+    branches: [preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safety-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout preview
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify runtime files are unchanged from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          forbidden_changes=$(git diff --name-only origin/main...HEAD -- \
+            public/app.js public/app.css public/index.html public/db.js public/cloud-sync.js public/sw.js public/manifest.webmanifest public/version.json netlify netlify.toml supabase || true)
+          if [ -n "$forbidden_changes" ]; then
+            echo "Runtime or backend files changed unexpectedly:"
+            echo "$forbidden_changes"
+            exit 1
+          fi
+
+      - name: Static syntax and JSON checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/app.js
+          node --check public/db.js
+          node --check public/cloud-sync.js
+          node --check public/sw.js
+          for f in netlify/functions/*.mjs; do node --check "$f"; done
+          node -e "JSON.parse(require('fs').readFileSync('public/version.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('public/seed-data.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('public/decision-metadata.json','utf8'))"
+
+      - name: Production runtime smoke check
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://comfy-heliotrope-475c71.netlify.app'
+          curl --fail --silent --show-error --location "$base/version.json" -o version-live.json
+          node -e "const v=require('./version-live.json'); if(v.version!=='4.5.0-phase1.2') { console.error(v); process.exit(1) }"
+          for p in / /manifest.webmanifest '/app.css?v=4.5.0-phase1.2' '/app.js?v=4.5.0-phase1.2'; do
+            code=$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' "$base$p")
+            test "$code" = "200" || { echo "$p -> $code"; exit 1; }
+          done
+
+      - name: Safe static load test
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://comfy-heliotrope-475c71.netlify.app'
+          paths=(
+            '/'
+            '/version.json'
+            '/manifest.webmanifest'
+            '/app.css?v=4.5.0-phase1.2'
+            '/app.js?v=4.5.0-phase1.2'
+          )
+          seq 1 150 | xargs -I{} -P10 bash -c '
+            set -e
+            base="$1"
+            idx=$(( {} % 5 ))
+            case "$idx" in
+              0) p="/" ;;
+              1) p="/version.json" ;;
+              2) p="/manifest.webmanifest" ;;
+              3) p="/app.css?v=4.5.0-phase1.2" ;;
+              4) p="/app.js?v=4.5.0-phase1.2" ;;
+            esac
+            code=$(curl --connect-timeout 5 --max-time 20 --retry 2 --retry-all-errors --silent --show-error --location --output /dev/null --write-out "%{http_code}" "$base$p")
+            test "$code" = "200" || { echo "$p -> $code"; exit 1; }
+          ' _ "$base"
+
+      - name: Gate result
+        run: echo 'PREVIEW SAFETY STATIC LOAD GATE = PASS'
