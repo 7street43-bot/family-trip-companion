@@ -3,17 +3,17 @@ name: Production Safety Gate
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       rollback_ref:
-        description: Git ref or commit SHA to restore through a rollback PR
+        description: Git ref or commit SHA whose runtime payload should be restored through preview
         required: true
         default: rollback/v4.5.0-phase1.2
       confirm:
-        description: Type ROLLBACK to create the rollback PR
+        description: Type ROLLBACK to create the rollback candidate PR
         required: true
 
 permissions:
@@ -30,12 +30,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Require preview as the only release source
+      - name: Require preview and explicit release authorization
         shell: bash
         run: |
           set -euo pipefail
           test "${{ github.head_ref }}" = "preview" || {
             echo "Only preview may be released to main. Got: ${{ github.head_ref }}"
+            exit 1
+          }
+          title='${{ github.event.pull_request.title }}'
+          [[ "$title" == *'[release-approved]'* ]] || {
+            echo 'Release is not explicitly authorized. Add [release-approved] to the PR title only after owner approval.'
             exit 1
           }
 
@@ -44,6 +49,38 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Candidate change policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=100
+          runtime_changes=$(git diff --name-only origin/main...HEAD -- public netlify/functions || true)
+          backend_changes=$(git diff --name-only origin/main...HEAD -- netlify/functions || true)
+          protected_changes=$(git diff --name-only origin/main...HEAD -- supabase netlify.toml scripts/netlify-deploy-guard.mjs .github/workflows || true)
+          messages=$(git log --format=%B origin/main..HEAD || true)
+
+          if [ -n "$runtime_changes" ]; then
+            git diff --name-only origin/main...HEAD -- public/version.json | grep -q '^public/version.json$' || {
+              echo 'Runtime changed but public/version.json was not updated.'
+              exit 1
+            }
+          fi
+
+          if [ -n "$backend_changes" ]; then
+            printf '%s' "$messages" | grep -Fq '[backend-approved]' || {
+              echo 'Backend files changed without [backend-approved] in the candidate commit range.'
+              exit 1
+            }
+          fi
+
+          if [ -n "$protected_changes" ]; then
+            printf '%s' "$messages" | grep -Fq '[governance-approved]' || {
+              echo 'Protected governance/data files changed without [governance-approved].'
+              echo "$protected_changes"
+              exit 1
+            }
+          fi
 
       - name: Static syntax and data checks
         shell: bash
@@ -77,19 +114,13 @@ jobs:
           console.log(`production baseline matches main: ${live}`);
           NODE
 
-      - name: Wait for preview to be stable
+      - name: Wait for preview to match candidate and become stable
         shell: bash
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
           expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
-          paths=(
-            '/'
-            '/version.json'
-            '/manifest.webmanifest'
-            '/app.css'
-            '/app.js'
-          )
+          paths=( '/' '/version.json' '/manifest.webmanifest' '/app.css' '/app.js' )
           consecutive=0
           for attempt in $(seq 1 36); do
             sweep_ok=1
@@ -121,12 +152,10 @@ jobs:
             else
               consecutive=0
             fi
-            if [ "$consecutive" -ge 3 ]; then
-              break
-            fi
+            if [ "$consecutive" -ge 3 ]; then break; fi
             sleep 5
           done
-          test "$consecutive" -ge 3 || { echo 'Preview did not stabilize'; exit 1; }
+          test "$consecutive" -ge 3 || { echo 'Preview did not stabilize on the candidate version'; exit 1; }
           sleep 3
 
       - name: Preview browser-like load gate
@@ -143,7 +172,7 @@ jobs:
             curl --fail --fail-early --silent --show-error --location \
               --connect-timeout 10 --max-time 30 \
               --retry 2 --retry-all-errors --retry-delay 1 \
-              -A 'FamilyTripReleaseGate/1.0' \
+              -A 'FamilyTripReleaseGate/2.0' \
               -o /dev/null "$base/?gate=$GITHUB_SHA" \
               -o /dev/null "$base/version.json?gate=$GITHUB_SHA" \
               -o /dev/null "$base/manifest.webmanifest?gate=$GITHUB_SHA" \
@@ -165,17 +194,45 @@ jobs:
           p95 = vals[max(0, int(len(vals) * 0.95) - 1)]
           maxv = max(vals)
           print(f'sessions=25 concurrency=5 p50_ms={p50:.0f} p95_ms={p95} max_ms={maxv}')
-          if p95 > 10000:
-              raise SystemExit(f'p95-session-too-slow:{p95}ms')
-          if maxv > 15000:
-              raise SystemExit(f'max-session-too-slow:{maxv}ms')
+          if p95 > 10000: raise SystemExit(f'p95-session-too-slow:{p95}ms')
+          if maxv > 15000: raise SystemExit(f'max-session-too-slow:{maxv}ms')
           PY
 
       - name: Release gate result
         run: echo 'PRODUCTION RELEASE GATE = PASS'
 
+  unauthorized-main-push-audit:
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[release-approved]') && !contains(github.event.head_commit.message, '[skip netlify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify fail-closed kept production on previous main runtime
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          before='${{ github.event.before }}'
+          test "$before" != '0000000000000000000000000000000000000000'
+          git cat-file -e "${before}^{commit}"
+          git show "${before}:public/version.json" > before-version.json
+          sleep 8
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            'https://comfy-heliotrope-475c71.netlify.app/version.json?failclosed='"$GITHUB_SHA" -o live.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const expected = JSON.parse(fs.readFileSync('before-version.json','utf8')).version;
+          const live = JSON.parse(fs.readFileSync('live.json','utf8')).version;
+          if (expected !== live) {
+            console.error({expectedPreviousMain: expected, live});
+            process.exit(1);
+          }
+          console.log(`fail-closed production remained on previous runtime: ${live}`);
+          NODE
+
   production-postdeploy:
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip netlify]')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release-approved]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -210,11 +267,7 @@ jobs:
                   break
                 fi
               done
-              if [ "$sweep_ok" = "1" ]; then
-                consecutive=$((consecutive+1))
-              else
-                consecutive=0
-              fi
+              if [ "$sweep_ok" = "1" ]; then consecutive=$((consecutive+1)); else consecutive=0; fi
             else
               consecutive=0
             fi
@@ -240,7 +293,7 @@ jobs:
             curl --fail --fail-early --silent --show-error --location \
               --connect-timeout 10 --max-time 30 \
               --retry 2 --retry-all-errors --retry-delay 1 \
-              -A 'FamilyTripProductionGate/1.0' \
+              -A 'FamilyTripProductionGate/2.0' \
               -o /dev/null "$base/?gate=$GITHUB_SHA" \
               -o /dev/null "$base/version.json?gate=$GITHUB_SHA" \
               -o /dev/null "$base/manifest.webmanifest?gate=$GITHUB_SHA" \
@@ -267,33 +320,43 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create rollback PR to previous main tree
+      - name: Create runtime-only rollback candidate PR into preview
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.event.before }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main --depth=50
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags
           git cat-file -e "${TARGET_SHA}^{commit}"
+          git merge-base --is-ancestor "$TARGET_SHA" origin/main || {
+            echo 'Automatic rollback target is not an ancestor of main.'
+            exit 1
+          }
           branch="auto-rollback-${GITHUB_RUN_ID}"
-          git checkout -b "$branch" origin/main
-          git rm -r --ignore-unmatch .
-          git checkout "$TARGET_SHA" -- .
-          git add -A
+          git checkout -b "$branch" origin/preview
+          for path in public netlify/functions; do
+            git rm -r --ignore-unmatch "$path"
+            if git cat-file -e "${TARGET_SHA}:${path}" 2>/dev/null; then
+              git checkout "$TARGET_SHA" -- "$path"
+            fi
+          done
+          git add -A public netlify/functions
+          unexpected=$(git diff --cached --name-only | grep -Ev '^(public/|netlify/functions/)' || true)
+          test -z "$unexpected" || { echo "Unexpected rollback paths: $unexpected"; exit 1; }
           if git diff --cached --quiet; then
-            echo 'No rollback diff to commit.'
+            echo 'No runtime rollback diff to commit.'
             exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m "Prepare rollback to ${TARGET_SHA} [release-approved]"
+          git commit -m "Prepare runtime rollback to ${TARGET_SHA} [rollback-candidate]"
           git push origin "$branch"
           gh pr create \
-            --base main \
+            --base preview \
             --head "$branch" \
-            --title "AUTO ROLLBACK to ${TARGET_SHA:0:12}" \
-            --body "Production post-deploy gate failed for ${GITHUB_SHA}. This PR restores the previous main tree at ${TARGET_SHA}. Review and merge only after explicit release approval."
+            --title "AUTO ROLLBACK candidate to ${TARGET_SHA:0:12}" \
+            --body "Production post-deploy gate failed for ${GITHUB_SHA}. This PR restores only public/ and netlify/functions/ from previous main ${TARGET_SHA}; governance, Netlify deploy guard, Supabase, and user data are preserved. Merge into preview only. After Preview Safety Gate passes, create the normal preview → main release PR and require explicit release approval."
 
   manual-rollback-pr:
     if: github.event_name == 'workflow_dispatch'
@@ -313,7 +376,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve target and create rollback PR
+      - name: Resolve target and create runtime-only rollback candidate PR into preview
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_REF: ${{ inputs.rollback_ref }}
@@ -329,26 +392,31 @@ jobs:
             echo "Unable to resolve rollback ref: ${REQUESTED_REF}"
             exit 1
           fi
-          git fetch origin main --depth=200
           git merge-base --is-ancestor "$target" origin/main || {
             echo 'Rollback target must be an ancestor of main.'
             exit 1
           }
           branch="manual-rollback-${GITHUB_RUN_ID}"
-          git checkout -b "$branch" origin/main
-          git rm -r --ignore-unmatch .
-          git checkout "$target" -- .
-          git add -A
+          git checkout -b "$branch" origin/preview
+          for path in public netlify/functions; do
+            git rm -r --ignore-unmatch "$path"
+            if git cat-file -e "${target}:${path}" 2>/dev/null; then
+              git checkout "$target" -- "$path"
+            fi
+          done
+          git add -A public netlify/functions
+          unexpected=$(git diff --cached --name-only | grep -Ev '^(public/|netlify/functions/)' || true)
+          test -z "$unexpected" || { echo "Unexpected rollback paths: $unexpected"; exit 1; }
           if git diff --cached --quiet; then
-            echo 'Requested rollback target is already identical to main.'
+            echo 'Requested rollback target is already identical to preview runtime.'
             exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m "Prepare manual rollback to ${target} [release-approved]"
+          git commit -m "Prepare manual runtime rollback to ${target} [rollback-candidate]"
           git push origin "$branch"
           gh pr create \
-            --base main \
+            --base preview \
             --head "$branch" \
-            --title "Manual rollback to ${target:0:12}" \
-            --body "Requested rollback ref: ${REQUESTED_REF}. Resolved target: ${target}. Merge only after Preview/Release Gate review and explicit release approval."
+            --title "Manual rollback candidate to ${target:0:12}" \
+            --body "Requested rollback ref: ${REQUESTED_REF}. Resolved target: ${target}. This PR restores only public/ and netlify/functions/; governance, Netlify deploy guard, Supabase, and user data remain untouched. Merge into preview only, verify Preview Safety Gate, then release preview → main after explicit approval."
