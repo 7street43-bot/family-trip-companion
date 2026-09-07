@@ -1,5 +1,6 @@
 [build]
   publish = "public"
+  ignore = "node ./scripts/netlify-deploy-guard.mjs"
 
 [functions]
   directory = "netlify/functions"

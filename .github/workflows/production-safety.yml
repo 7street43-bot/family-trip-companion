@@ -1,0 +1,354 @@
+name: Production Safety Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_ref:
+        description: Git ref or commit SHA to restore through a rollback PR
+        required: true
+        default: rollback/v4.5.0-phase1.2
+      confirm:
+        description: Type ROLLBACK to create the rollback PR
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: production-safety-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require preview as the only release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.head_ref }}" = "preview" || {
+            echo "Only preview may be released to main. Got: ${{ github.head_ref }}"
+            exit 1
+          }
+
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Static syntax and data checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/app.js
+          node --check public/db.js
+          node --check public/cloud-sync.js
+          node --check public/sw.js
+          for f in netlify/functions/*.mjs; do node --check "$f"; done
+          node -e "JSON.parse(require('fs').readFileSync('public/version.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('public/seed-data.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('public/decision-metadata.json','utf8'))"
+
+      - name: Verify production still matches current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git show origin/main:public/version.json > expected-main-version.json
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+            'https://comfy-heliotrope-475c71.netlify.app/version.json' -o live-production-version.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const expected = JSON.parse(fs.readFileSync('expected-main-version.json','utf8')).version;
+          const live = JSON.parse(fs.readFileSync('live-production-version.json','utf8')).version;
+          if (expected !== live) {
+            console.error({expected, live});
+            process.exit(1);
+          }
+          console.log(`production baseline matches main: ${live}`);
+          NODE
+
+      - name: Wait for preview to be stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          paths=(
+            '/'
+            '/version.json'
+            '/manifest.webmanifest'
+            '/app.css'
+            '/app.js'
+          )
+          consecutive=0
+          for attempt in $(seq 1 36); do
+            sweep_ok=1
+            for p in "${paths[@]}"; do
+              if ! curl --fail --silent --show-error --location \
+                --connect-timeout 10 --max-time 30 \
+                --retry 1 --retry-all-errors --retry-delay 1 \
+                -o /dev/null "${base}${p}?release_gate=${GITHUB_SHA}"; then
+                sweep_ok=0
+                break
+              fi
+            done
+            if [ "$sweep_ok" = "1" ]; then
+              if curl --fail --silent --show-error --location \
+                --connect-timeout 10 --max-time 30 \
+                --retry 1 --retry-all-errors --retry-delay 1 \
+                "${base}/version.json?release_gate=${GITHUB_SHA}" -o preview-version.json \
+                && EXPECTED="$expected" node - <<'NODE'
+          const fs = require('fs');
+          const live = JSON.parse(fs.readFileSync('preview-version.json','utf8')).version;
+          if (live !== process.env.EXPECTED) process.exit(1);
+          NODE
+              then
+                consecutive=$((consecutive+1))
+                echo "stable preview sweep ${consecutive}/3"
+              else
+                consecutive=0
+              fi
+            else
+              consecutive=0
+            fi
+            if [ "$consecutive" -ge 3 ]; then
+              break
+            fi
+            sleep 5
+          done
+          test "$consecutive" -ge 3 || { echo 'Preview did not stabilize'; exit 1; }
+          sleep 3
+
+      - name: Preview browser-like load gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          rm -rf stress-times
+          mkdir stress-times
+          run_session() {
+            set -euo pipefail
+            sid="$1"
+            started=$(date +%s%3N)
+            curl --fail --fail-early --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --retry 2 --retry-all-errors --retry-delay 1 \
+              -A 'FamilyTripReleaseGate/1.0' \
+              -o /dev/null "$base/?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/version.json?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/manifest.webmanifest?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.css?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.js?gate=$GITHUB_SHA"
+            ended=$(date +%s%3N)
+            echo $((ended-started)) > "stress-times/$sid.ms"
+          }
+          export -f run_session
+          export base GITHUB_SHA
+          seq 1 25 | xargs -I{} -P5 bash -c 'set -euo pipefail; run_session "$1"' _ {}
+          python3 - <<'PY'
+          from pathlib import Path
+          import statistics
+          vals = sorted(int(p.read_text().strip()) for p in Path('stress-times').glob('*.ms'))
+          if len(vals) != 25:
+              raise SystemExit(f'session-count-mismatch:{len(vals)}')
+          p50 = statistics.median(vals)
+          p95 = vals[max(0, int(len(vals) * 0.95) - 1)]
+          maxv = max(vals)
+          print(f'sessions=25 concurrency=5 p50_ms={p50:.0f} p95_ms={p95} max_ms={maxv}')
+          if p95 > 10000:
+              raise SystemExit(f'p95-session-too-slow:{p95}ms')
+          if maxv > 15000:
+              raise SystemExit(f'max-session-too-slow:{maxv}ms')
+          PY
+
+      - name: Release gate result
+        run: echo 'PRODUCTION RELEASE GATE = PASS'
+
+  production-postdeploy:
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip netlify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout production source
+        uses: actions/checkout@v4
+
+      - name: Wait for production to match main
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          consecutive=0
+          for attempt in $(seq 1 48); do
+            if curl --fail --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --retry 1 --retry-all-errors --retry-delay 1 \
+              "$base/version.json?postdeploy=${GITHUB_SHA}" -o production-version.json \
+              && EXPECTED="$expected" node - <<'NODE'
+          const fs = require('fs');
+          const live = JSON.parse(fs.readFileSync('production-version.json','utf8')).version;
+          if (live !== process.env.EXPECTED) process.exit(1);
+          NODE
+            then
+              sweep_ok=1
+              for p in / /manifest.webmanifest /app.css /app.js; do
+                if ! curl --fail --silent --show-error --location \
+                  --connect-timeout 10 --max-time 30 \
+                  --retry 1 --retry-all-errors --retry-delay 1 \
+                  -o /dev/null "${base}${p}?postdeploy=${GITHUB_SHA}"; then
+                  sweep_ok=0
+                  break
+                fi
+              done
+              if [ "$sweep_ok" = "1" ]; then
+                consecutive=$((consecutive+1))
+              else
+                consecutive=0
+              fi
+            else
+              consecutive=0
+            fi
+            if [ "$consecutive" -ge 3 ]; then
+              echo 'Production is stable and matches main.'
+              break
+            fi
+            sleep 5
+          done
+          test "$consecutive" -ge 3 || { echo 'Production did not converge to main'; exit 1; }
+
+      - name: Production browser-like load gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://comfy-heliotrope-475c71.netlify.app'
+          rm -rf stress-times
+          mkdir stress-times
+          run_session() {
+            set -euo pipefail
+            sid="$1"
+            started=$(date +%s%3N)
+            curl --fail --fail-early --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --retry 2 --retry-all-errors --retry-delay 1 \
+              -A 'FamilyTripProductionGate/1.0' \
+              -o /dev/null "$base/?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/version.json?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/manifest.webmanifest?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.css?gate=$GITHUB_SHA" \
+              -o /dev/null "$base/app.js?gate=$GITHUB_SHA"
+            ended=$(date +%s%3N)
+            echo $((ended-started)) > "stress-times/$sid.ms"
+          }
+          export -f run_session
+          export base GITHUB_SHA
+          seq 1 25 | xargs -I{} -P5 bash -c 'set -euo pipefail; run_session "$1"' _ {}
+          test "$(find stress-times -type f | wc -l)" -eq 25
+
+      - name: Production gate result
+        run: echo 'PRODUCTION POST-DEPLOY GATE = PASS'
+
+  automatic-rollback-pr:
+    needs: production-postdeploy
+    if: always() && github.event_name == 'push' && needs.production-postdeploy.result == 'failure' && github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create rollback PR to previous main tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=50
+          git cat-file -e "${TARGET_SHA}^{commit}"
+          branch="auto-rollback-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git rm -r --ignore-unmatch .
+          git checkout "$TARGET_SHA" -- .
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No rollback diff to commit.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Prepare rollback to ${TARGET_SHA} [release-approved]"
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "AUTO ROLLBACK to ${TARGET_SHA:0:12}" \
+            --body "Production post-deploy gate failed for ${GITHUB_SHA}. This PR restores the previous main tree at ${TARGET_SHA}. Review and merge only after explicit release approval."
+
+  manual-rollback-pr:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit rollback confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirm }}" = 'ROLLBACK' || {
+            echo 'Confirmation must be exactly ROLLBACK.'
+            exit 1
+          }
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target and create rollback PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_REF: ${{ inputs.rollback_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags
+          if target=$(git rev-parse --verify "${REQUESTED_REF}^{commit}" 2>/dev/null); then
+            :
+          elif target=$(git rev-parse --verify "origin/${REQUESTED_REF}^{commit}" 2>/dev/null); then
+            :
+          else
+            echo "Unable to resolve rollback ref: ${REQUESTED_REF}"
+            exit 1
+          fi
+          git fetch origin main --depth=200
+          git merge-base --is-ancestor "$target" origin/main || {
+            echo 'Rollback target must be an ancestor of main.'
+            exit 1
+          }
+          branch="manual-rollback-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git rm -r --ignore-unmatch .
+          git checkout "$target" -- .
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Requested rollback target is already identical to main.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Prepare manual rollback to ${target} [release-approved]"
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Manual rollback to ${target:0:12}" \
+            --body "Requested rollback ref: ${REQUESTED_REF}. Resolved target: ${target}. Merge only after Preview/Release Gate review and explicit release approval."
