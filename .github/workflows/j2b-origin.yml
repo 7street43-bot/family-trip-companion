@@ -1,0 +1,149 @@
+name: J2B Origin
+
+on:
+  push:
+    branches: [j2b-origin-v1, preview]
+    paths:
+      - 'public/itinerary-v2*'
+      - 'public/itinerary-origin*'
+      - 'netlify/functions/itinerary-origin-search.mjs'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'public/version.json'
+      - 'scripts/prepare-site.mjs'
+      - 'tests/j2a-*.mjs'
+      - 'tests/j2b-*.mjs'
+      - '.github/workflows/j2b-origin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j2b-origin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and origin contracts
+        run: |
+          set -euo pipefail
+          node --check public/itinerary-v2-core.mjs
+          node --check public/itinerary-v2.mjs
+          node --check public/itinerary-origin.mjs
+          node --check netlify/functions/itinerary-origin-search.mjs
+          node --check public/sw.js
+          node --check public/app.js
+          node --test tests/j2b-origin.test.mjs
+          node --test tests/j2a-itinerary-v2.test.mjs
+          node --test tests/j2a-candidate-pool.test.mjs
+      - name: J2B-1 isolation invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('public/index.html','utf8');
+          const sw=fs.readFileSync('public/sw.js','utf8');
+          const core=fs.readFileSync('public/itinerary-v2-core.mjs','utf8');
+          const origin=fs.readFileSync('public/itinerary-origin.mjs','utf8');
+          const provider=fs.readFileSync('netlify/functions/itinerary-origin-search.mjs','utf8');
+          const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
+          for(const needle of ['itinerary-origin.css','itinerary-origin.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
+          for(const needle of ['itinerary-origin.css','itinerary-origin.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
+          if(!core.includes("const MODEL_VERSION = 2")) throw new Error('J2B changed itinerary modelVersion');
+          if(!core.includes('globalThis.TwinTripDefaultOrigin')) throw new Error('default origin extension point missing');
+          if(!core.includes('!input.id ? globalThis.TwinTripDefaultOrigin : null')) throw new Error('existing-trip no-retrofit guard missing');
+          if(!origin.includes("TwinDB.put('settings',{key:'defaultOrigin'")) throw new Error('default origin persistence missing');
+          if(!origin.includes('/api/itinerary-origin-search')) throw new Error('origin provider wiring missing');
+          if(!provider.includes("path: '/api/itinerary-origin-search'")) throw new Error('origin endpoint path missing');
+          if(v.channel!=='J2B' || v.version!=='4.5.0-phase1.9-j2b.1') throw new Error(`wrong J2B-1 runtime:${v.version}/${v.channel}`);
+          NODE
+      - name: Existing frontend regression contracts
+        run: |
+          set -euo pipefail
+          node --test tests/j1k-journal-shell.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-runtime.test.mjs
+      - name: Result
+        run: echo 'J2B-1 ORIGIN CONTRACT + J2A COMPATIBILITY = PASS'
+
+  webkit-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start local publish server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/j2b-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/j2b-http.log
+          exit 1
+      - name: J2A candidate regression
+        env:
+          J2A_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2a-webkit-e2e.mjs
+      - name: Mobile and desktop origin gate
+        env:
+          J2B_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2b-origin-webkit-e2e.mjs
+      - name: Result
+        run: echo 'J2B-1 WEBKIT ORIGIN + J2A REGRESSION = PASS'
+
+  live-preview-origin-smoke:
+    if: github.ref == 'refs/heads/preview'
+    needs: [contract, webkit-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for fixed Preview runtime
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+              "$base/version.json?j2b_live=${GITHUB_SHA}" -o /tmp/j2b-version.json \
+              && EXPECTED="$expected" node - <<'NODE'
+          const fs=require('fs');
+          const live=JSON.parse(fs.readFileSync('/tmp/j2b-version.json','utf8')).version;
+          if(live!==process.env.EXPECTED) process.exit(1);
+          NODE
+            then
+              echo "Fixed Preview runtime ready: $expected"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Fixed Preview did not reach J2B-1 runtime in time.'
+          exit 1
+      - name: Google Places live origin smoke
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 40 \
+            --retry 1 --retry-all-errors --retry-delay 2 \
+            -X POST "$base/api/itinerary-origin-search" \
+            -H 'content-type: application/json' \
+            --data '{"query":"新竹市政府"}' \
+            --output /tmp/j2b-origin.json --write-out '%{http_code}')
+          test "$code" = '200' || { echo "origin API HTTP $code"; cat /tmp/j2b-origin.json; exit 1; }
+          node - <<'NODE'
+          const fs=require('fs');
+          const body=JSON.parse(fs.readFileSync('/tmp/j2b-origin.json','utf8'));
+          if(body?.provider!=='google-places') throw new Error('origin-provider-mismatch');
+          if(!Array.isArray(body?.candidates) || body.candidates.length<1) throw new Error('no-origin-candidates');
+          const c=body.candidates[0];
+          if(!c.placeId || !c.address || !Number.isFinite(Number(c.latitude)) || !Number.isFinite(Number(c.longitude))) throw new Error('origin-candidate-incomplete');
+          console.log(`origin_candidates=${body.candidates.length} sample=${c.displayName} ${c.address}`);
+          NODE
+      - name: Result
+        run: echo 'J2B-1 GOOGLE PLACES LIVE ORIGIN GATE = PASS'
