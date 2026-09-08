@@ -74,7 +74,8 @@ jobs:
           const idleMaintenance=app.indexOf("scheduleIdleTask(async()=>{\n        await reloadData();");
           if(fastRead<0 || idleMaintenance<0 || fastRead>idleMaintenance) throw new Error('startup migrations are not deferred after fast local read');
           if(!app.includes('TwinUpdateManager.register')) throw new Error('update-manager ownership marker missing');
-          if(v.channel!=='J2A' || v.version!=='4.5.0-phase1.8-j2a.3.1') throw new Error(`wrong J2A-3.1 runtime:${v.version}/${v.channel}`);
+          const allowedRuntime=(v.channel==='J2A' && v.version==='4.5.0-phase1.8-j2a.3.1') || (v.channel==='J2B' && v.version==='4.5.0-phase1.9-j2b.1');
+          if(!allowedRuntime) throw new Error(`wrong J2A-compatible runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts
         run: |
@@ -83,7 +84,7 @@ jobs:
           node --test tests/journal-j1f-ui.test.mjs
           node --test tests/journal-j1g-runtime.test.mjs
       - name: Result
-        run: echo 'J2A-3.1 IDLE STARTUP ISOLATION + CANDIDATE PROVIDER CONTRACT = PASS'
+        run: echo 'J2A-3.1 INVARIANTS + SUCCESSOR RUNTIME CANDIDATE PROVIDER CONTRACT = PASS'
 
   webkit-e2e:
     runs-on: ubuntu-latest
@@ -107,7 +108,7 @@ jobs:
           J2A_BASE_URL: http://127.0.0.1:4173
         run: node tests/j2a-webkit-e2e.mjs
       - name: Result
-        run: echo 'J2A-3.1 WEBKIT CANDIDATE POOL UX GATE = PASS'
+        run: echo 'J2A WEBKIT CANDIDATE POOL UX GATE = PASS'
 
   live-preview-provider-smoke:
     if: github.ref == 'refs/heads/preview'
@@ -162,4 +163,4 @@ jobs:
           console.log(`live_candidates=${body.candidates.length} queries=${body.queriesTried.length} sample=${body.candidates.slice(0,3).map(x=>x.title).join(' | ')}`);
           NODE
       - name: Result
-        run: echo 'J2A-3.1 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
+        run: echo 'J2A GOOGLE PLACES LIVE PROVIDER GATE = PASS'
