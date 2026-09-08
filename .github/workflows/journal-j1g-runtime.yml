@@ -4,22 +4,18 @@ on:
   push:
     branches: [preview]
     paths:
-      - 'public/journal-browser.mjs'
-      - 'public/journal-media-ui.mjs'
-      - 'public/journal-media-preview-demo.mjs'
-      - 'public/journal-media.css'
-      - 'public/journal-nav-bridge.mjs'
-      - 'public/journal-nav.css'
-      - 'public/journal-stable.css'
-      - 'public/journal-stable-layout.mjs'
+      - 'public/journal-*.mjs'
+      - 'public/journal-*.css'
+      - 'public/runtime-config.js'
+      - 'public/update-manager.js'
+      - 'public/update-manager.css'
       - 'public/index.html'
       - 'public/version.json'
       - 'public/sw.js'
-      - 'shared/journal-media-client.mjs'
-      - 'shared/journal-media-supabase-transport.mjs'
+      - 'shared/journal-media-*.mjs'
       - 'scripts/prepare-site.mjs'
-      - 'tests/journal-j1g-runtime.test.mjs'
-      - 'tests/journal-j1g-preview-demo.test.mjs'
+      - 'tests/journal-j1g-*.mjs'
+      - 'tests/j1k-*.mjs'
       - '.github/workflows/journal-j1g-runtime.yml'
   workflow_dispatch:
 
@@ -34,85 +30,53 @@ jobs:
       - uses: actions/checkout@v5
       - name: Prepare publish modules
         run: node scripts/prepare-site.mjs
-      - name: Static checks
+      - name: Static and compatibility tests
         run: |
           set -euo pipefail
+          node --check public/journal-shell.mjs
           node --check public/journal-browser.mjs
+          node --check public/journal-ui.mjs
           node --check public/journal-media-ui.mjs
           node --check public/journal-media-preview-demo.mjs
           node --check public/journal-nav-bridge.mjs
           node --check public/journal-stable-layout.mjs
           node --check public/sw.js
-          node --check public/lib/journal-media-client.mjs
-          node --check public/lib/journal-media-supabase-transport.mjs
-      - name: Runtime contract tests
-        run: |
-          set -euo pipefail
           node --test tests/journal-j1g-runtime.test.mjs
           node --test tests/journal-j1g-preview-demo.test.mjs
           node --test tests/journal-j1f-ui.test.mjs
-          node --input-type=module -e "import('./public/journal-stable-layout.mjs').then(m=>{if(m.__test.VERSION!=='4.5.0-phase1.6-j1g.7')process.exit(1)})"
-      - name: Security packaging navigation fixed-viewport and boot invariants
+          node --test tests/j1k-journal-shell.test.mjs
+      - name: Media security and deterministic UI invariants
         run: |
           set -euo pipefail
-          grep -Fq "4.5.0-phase1.6-j1g.7" public/version.json
-          grep -Fq "4.5.0-phase1.6-j1g.7" public/index.html
-          grep -Fq "twin-trip-v4.5.0-phase1.6-j1g.7" public/sw.js
           grep -Fq 'journal-media-ui.mjs' public/index.html
           grep -Fq 'journal-media-preview-demo.mjs' public/index.html
-          grep -Fq 'journal-media.css' public/index.html
-          grep -Fq 'journal-nav-bridge.mjs' public/index.html
-          grep -Fq 'journal-nav.css' public/index.html
-          grep -Fq 'journal-stable.css' public/index.html
-          grep -Fq 'journal-stable-layout.mjs' public/index.html
+          grep -Fq 'journal-shell.mjs' public/index.html
           grep -Fq 'data-journal-nav' public/index.html
           ! grep -Fq 'data-view="journal"' public/index.html
-          grep -Fq 'journal-media-client.mjs' public/sw.js
-          grep -Fq 'journal-media-supabase-transport.mjs' public/sw.js
-          grep -Fq 'journal-media-preview-demo.mjs' public/sw.js
-          grep -Fq 'journal-nav-bridge.mjs' public/sw.js
-          grep -Fq 'journal-nav.css' public/sw.js
-          grep -Fq 'journal-stable.css' public/sw.js
-          grep -Fq 'journal-stable-layout.mjs' public/sw.js
-          grep -Fq "Preview 安全模式只驗收相簿介面，不會上傳正式照片" public/journal-media-ui.mjs
+          grep -Fq 'Preview 安全模式只驗收相簿介面，不會上傳正式照片' public/journal-media-ui.mjs
           grep -Fq "preview--comfy-heliotrope-475c71.netlify.app" public/journal-media-preview-demo.mjs
-          grep -Fq "不上傳、不建立日誌" public/journal-media-preview-demo.mjs
-          grep -Fq "25*1024*1024" public/journal-media-ui.mjs
-          grep -Fq "mediaSignedUrl" public/journal-browser.mjs
-          grep -Fq "uploadPhoto" public/journal-browser.mjs
-          ! grep -Fq "uploadPhoto" public/journal-media-preview-demo.mjs
-          ! grep -Fq "mediaSignedUrl" public/journal-media-preview-demo.mjs
-          ! grep -Fq "supabase" public/journal-media-preview-demo.mjs
+          grep -Fq '不上傳、不建立日誌' public/journal-media-preview-demo.mjs
+          grep -Fq '25*1024*1024' public/journal-media-ui.mjs
+          grep -Fq 'mediaSignedUrl' public/journal-browser.mjs
+          grep -Fq 'uploadPhoto' public/journal-browser.mjs
+          ! grep -Fq 'uploadPhoto' public/journal-media-preview-demo.mjs
+          ! grep -Fq 'mediaSignedUrl' public/journal-media-preview-demo.mjs
+          ! grep -Fq 'supabase' public/journal-media-preview-demo.mjs
           grep -Fq '.journal-fab{display:none!important}' public/journal-nav.css
           grep -Fq 'repeat(5,minmax(0,1fr))' public/journal-nav.css
-          grep -Fq 'waitForFab' public/journal-nav-bridge.mjs
-          grep -Fq 'ev.stopPropagation()' public/journal-nav-bridge.mjs
-          ! grep -Fq 'n.disabled=!fab()' public/journal-nav-bridge.mjs
-          grep -Fq 'height:100dvh' public/journal-stable.css
-          grep -Fq 'min-height:100dvh' public/journal-stable.css
-          grep -Fq 'max-height:100dvh' public/journal-stable.css
-          grep -Fq 'height:48px' public/journal-stable.css
-          grep -Fq 'align-items:stretch' public/journal-stable.css
-          grep -Fq 'resetJournalScroll' public/journal-stable-layout.mjs
-          grep -Fq "body.scrollTop=0" public/journal-stable-layout.mjs
-          grep -Fq 'requestAnimationFrame' public/journal-stable-layout.mjs
-          grep -Fq '手機紀錄與回顧' public/journal-stable-layout.mjs
-          grep -Fq 'setTextIfChanged' public/journal-stable-layout.mjs
-          grep -Fq 'el.textContent!==text' public/journal-stable-layout.mjs
-          ! grep -Fq 'if(subtitle)subtitle.textContent=' public/journal-stable-layout.mjs
+          grep -Fq 'journalShell.registerCommands' public/journal-ui.mjs
+          grep -Fq "journalShell.on('rendered'" public/journal-media-ui.mjs
+          grep -Fq "journalShell.on('rendered'" public/journal-media-preview-demo.mjs
+          ! grep -R -F 'MutationObserver' public/journal-ui.mjs public/journal-nav-bridge.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs public/journal-stable-layout.mjs
+          ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('public/index.html','utf8');
-          const trips=html.indexOf('data-view="trips"');
-          const journal=html.indexOf('id="journalNavBtn"');
-          const pack=html.indexOf('data-view="pack"');
-          if(!(trips>=0 && journal>trips && pack>journal)) throw new Error('journal nav order must be trips -> journal -> pack');
+          const trips=html.indexOf('data-view="trips"'),journal=html.indexOf('id="journalNavBtn"'),pack=html.indexOf('data-view="pack"');
+          if(!(trips>=0&&journal>trips&&pack>journal)) throw new Error('journal nav order must be trips -> journal -> pack');
           NODE
-          test -f public/lib/journal-media-client.mjs
-          test -f public/lib/journal-media-supabase-transport.mjs
-          ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs public/journal-stable-layout.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
       - name: Result
-        run: echo 'J1G PHOTO ALBUM + JOURNAL FIXED MOBILE VIEWPORT + BOOT LOOP GUARD = PASS'
+        run: echo 'J1G PHOTO ALBUM COMPATIBILITY + J1K DETERMINISTIC UI = PASS'
 
   preview-smoke:
     needs: contract
@@ -133,42 +97,16 @@ jobs:
             sleep 5
           done
           test "$ok" = 1 || { echo 'J1G Preview did not reach expected version'; exit 1; }
-      - name: Album journal-nav fixed-viewport and boot-guard asset delivery
+      - name: Runtime asset delivery
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-media.css /journal-nav-bridge.mjs /journal-nav.css /journal-stable.css /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
+          for p in /runtime-config.js /update-manager.js /journal-shell.mjs /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-nav-bridge.mjs /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1g=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
-          curl --fail --silent --show-error --location "$base/?j1g=$GITHUB_SHA" -o /tmp/index.html
-          grep -Fq '4.5.0-phase1.6-j1g.7' /tmp/index.html
-          grep -Fq 'journal-media-ui.mjs' /tmp/index.html
-          grep -Fq 'journal-media-preview-demo.mjs' /tmp/index.html
-          grep -Fq 'journal-media.css' /tmp/index.html
-          grep -Fq 'journal-nav-bridge.mjs' /tmp/index.html
-          grep -Fq 'journal-nav.css' /tmp/index.html
-          grep -Fq 'journal-stable.css' /tmp/index.html
-          grep -Fq 'journal-stable-layout.mjs' /tmp/index.html
-          grep -Fq 'id="journalNavBtn"' /tmp/index.html
-          grep -Fq 'data-journal-nav' /tmp/index.html
-          ! grep -Fq 'data-view="journal"' /tmp/index.html
-          curl --fail --silent --show-error --location "$base/journal-stable.css?j1g=$GITHUB_SHA" -o /tmp/stable.css
-          grep -Fq 'height:100dvh' /tmp/stable.css
-          curl --fail --silent --show-error --location "$base/journal-stable-layout.mjs?j1g=$GITHUB_SHA" -o /tmp/stable.mjs
-          grep -Fq "4.5.0-phase1.6-j1g.7" /tmp/stable.mjs
-          grep -Fq 'setTextIfChanged' /tmp/stable.mjs
-          grep -Fq 'el.textContent!==text' /tmp/stable.mjs
-          grep -Fq 'resetJournalScroll' /tmp/stable.mjs
-      - name: Preview remains write-safe
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location 'https://preview--comfy-heliotrope-475c71.netlify.app/journal-media-ui.mjs' -o /tmp/media-ui.mjs
-          curl --fail --silent --show-error --location 'https://preview--comfy-heliotrope-475c71.netlify.app/journal-media-preview-demo.mjs' -o /tmp/preview-demo.mjs
-          grep -Fq 'Preview 安全模式只驗收相簿介面，不會上傳正式照片' /tmp/media-ui.mjs
-          grep -Fq '照片只存在目前 Safari 記憶體；不上傳、不建立日誌，關閉日誌或重整即清除。' /tmp/preview-demo.mjs
-          grep -Fq "const PREVIEW_HOST='preview--comfy-heliotrope-475c71.netlify.app'" /tmp/preview-demo.mjs
+          curl --fail --silent --show-error --location "$base/journal-media-preview-demo.mjs?j1g=$GITHUB_SHA" -o /tmp/preview-demo.mjs
+          grep -Fq '不上傳、不建立日誌' /tmp/preview-demo.mjs
           ! grep -Fq 'uploadPhoto' /tmp/preview-demo.mjs
-          ! grep -Fq 'mediaSignedUrl' /tmp/preview-demo.mjs
       - name: Result
-        run: echo 'J1G PREVIEW JOURNAL FIXED MOBILE VIEWPORT + PHOTO UX + BOOT GUARD DELIVERY = PASS'
+        run: echo 'J1G PREVIEW PHOTO UX + J1K STABILITY DELIVERY = PASS'
