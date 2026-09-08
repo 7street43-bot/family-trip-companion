@@ -19,6 +19,13 @@ function autoTitle(date) {
   return `${Number(m)}/${Number(d)} 一日遊`;
 }
 
+function stopCandidateKey(stop = {}) {
+  if (stop.candidateKey) return String(stop.candidateKey);
+  if (stop.entityId) return `entity:${stop.entityId}`;
+  if (stop.placeId) return `place:${stop.placeId}`;
+  return '';
+}
+
 export function createTrip(input = {}) {
   const now = new Date().toISOString();
   const date = input.date || localDateISO();
@@ -31,20 +38,31 @@ export function createTrip(input = {}) {
     date,
     departureTime: input.departureTime || '09:00',
     stops: Array.isArray(input.stops) ? input.stops.map((s, i) => normalizeStop(s, i)) : [],
+    plannerInput: input.plannerInput && typeof input.plannerInput === 'object' ? { ...input.plannerInput } : null,
     createdAt: input.createdAt || now,
     updatedAt: now
   };
 }
 
 export function normalizeStop(stop = {}, index = 0) {
+  const entityId = stop.entityId || null;
+  const placeId = stop.placeId || null;
+  const candidateKey = stop.candidateKey || (entityId ? `entity:${entityId}` : placeId ? `place:${placeId}` : '');
   return {
     id: stop.id || uid('stopv2'),
-    kind: stop.kind || (stop.entityId ? 'entity' : 'custom'),
-    entityId: stop.entityId || null,
+    kind: stop.kind || (entityId ? 'entity' : placeId ? 'external' : 'custom'),
+    candidateKey: candidateKey || null,
+    source: stop.source || (entityId ? 'saved' : placeId ? 'external' : 'custom'),
+    entityId,
+    placeId,
     title: String(stop.title || '').trim() || '未命名地點',
     entityType: stop.entityType || 'attraction',
     latitude: Number.isFinite(stop.latitude) ? stop.latitude : null,
     longitude: Number.isFinite(stop.longitude) ? stop.longitude : null,
+    address: String(stop.address || ''),
+    googleMapsUrl: String(stop.googleMapsUrl || ''),
+    rating: Number.isFinite(stop.rating) ? stop.rating : null,
+    userRatingCount: Number.isFinite(stop.userRatingCount) ? stop.userRatingCount : null,
     plannedTime: stop.plannedTime || '',
     note: String(stop.note || ''),
     order: index
@@ -54,16 +72,39 @@ export function normalizeStop(stop = {}, index = 0) {
 export function stopFromEntity(entity, index = 0) {
   return normalizeStop({
     kind: 'entity',
+    candidateKey: `entity:${entity.id}`,
+    source: entity.favorite ? 'favorite' : 'saved',
     entityId: entity.id,
     title: entity.name,
     entityType: entity.entityType,
     latitude: entity.latitude,
-    longitude: entity.longitude
+    longitude: entity.longitude,
+    address: [entity.county || entity.cityRaw, entity.district].filter(Boolean).join(' ')
+  }, index);
+}
+
+export function stopFromCandidate(candidate = {}, index = 0) {
+  return normalizeStop({
+    kind: candidate.entityId ? 'entity' : candidate.placeId ? 'external' : 'custom',
+    candidateKey: candidate.key,
+    source: candidate.source,
+    entityId: candidate.entityId,
+    placeId: candidate.placeId,
+    title: candidate.title,
+    entityType: candidate.entityType,
+    latitude: candidate.latitude,
+    longitude: candidate.longitude,
+    address: candidate.address,
+    googleMapsUrl: candidate.googleMapsUrl,
+    rating: candidate.rating,
+    userRatingCount: candidate.userRatingCount
   }, index);
 }
 
 export function customStop(title, index = 0) {
-  return normalizeStop({ kind: 'custom', title }, index);
+  const stop = normalizeStop({ kind: 'custom', title }, index);
+  stop.candidateKey = `custom:${stop.id}`;
+  return stop;
 }
 
 export function withEntities(trip, entities = []) {
@@ -75,6 +116,37 @@ export function withEntities(trip, entities = []) {
     additions.push(stopFromEntity(entity, trip.stops.length + additions.length));
   }
   return createTrip({ ...trip, stops: [...trip.stops, ...additions], createdAt: trip.createdAt });
+}
+
+export function withCandidates(trip, candidates = [], selectionOrder = []) {
+  const selected = new Set(selectionOrder);
+  const byKey = new Map(candidates.filter(Boolean).map(candidate => [candidate.key, candidate]));
+  const next = [];
+  const included = new Set();
+
+  // Existing stop order wins. This preserves manual reordering when the user returns
+  // to the candidate pool, changes the selection, then confirms again.
+  for (const stop of trip.stops || []) {
+    const key = stopCandidateKey(stop);
+    if (!key) {
+      if (stop.kind === 'custom') next.push(stop);
+      continue;
+    }
+    if (!selected.has(key)) continue;
+    next.push(stop);
+    included.add(key);
+  }
+
+  // Newly selected candidates are appended in the order in which the user selected them.
+  for (const key of selectionOrder) {
+    if (included.has(key)) continue;
+    const candidate = byKey.get(key);
+    if (!candidate) continue;
+    next.push(stopFromCandidate(candidate, next.length));
+    included.add(key);
+  }
+
+  return createTrip({ ...trip, stops: next, createdAt: trip.createdAt });
 }
 
 export function withCustomStop(trip, title) {
