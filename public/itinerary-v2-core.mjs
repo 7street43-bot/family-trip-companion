@@ -23,6 +23,7 @@ function stopCandidateKey(stop = {}) {
   if (stop.candidateKey) return String(stop.candidateKey);
   if (stop.entityId) return `entity:${stop.entityId}`;
   if (stop.placeId) return `place:${stop.placeId}`;
+  if (stop.kind === 'custom' && stop.id) return `custom:${stop.id}`;
   return '';
 }
 
@@ -45,12 +46,14 @@ export function createTrip(input = {}) {
 }
 
 export function normalizeStop(stop = {}, index = 0) {
+  const id = stop.id || uid('stopv2');
   const entityId = stop.entityId || null;
   const placeId = stop.placeId || null;
-  const candidateKey = stop.candidateKey || (entityId ? `entity:${entityId}` : placeId ? `place:${placeId}` : '');
+  const kind = stop.kind || (entityId ? 'entity' : placeId ? 'external' : 'custom');
+  const candidateKey = stop.candidateKey || (entityId ? `entity:${entityId}` : placeId ? `place:${placeId}` : kind === 'custom' ? `custom:${id}` : '');
   return {
-    id: stop.id || uid('stopv2'),
-    kind: stop.kind || (entityId ? 'entity' : placeId ? 'external' : 'custom'),
+    id,
+    kind,
     candidateKey: candidateKey || null,
     source: stop.source || (entityId ? 'saved' : placeId ? 'external' : 'custom'),
     entityId,
@@ -102,9 +105,7 @@ export function stopFromCandidate(candidate = {}, index = 0) {
 }
 
 export function customStop(title, index = 0) {
-  const stop = normalizeStop({ kind: 'custom', title }, index);
-  stop.candidateKey = `custom:${stop.id}`;
-  return stop;
+  return normalizeStop({ kind: 'custom', title }, index);
 }
 
 export function withEntities(trip, entities = []) {
@@ -128,10 +129,7 @@ export function withCandidates(trip, candidates = [], selectionOrder = []) {
   // to the candidate pool, changes the selection, then confirms again.
   for (const stop of trip.stops || []) {
     const key = stopCandidateKey(stop);
-    if (!key) {
-      if (stop.kind === 'custom') next.push(stop);
-      continue;
-    }
+    if (!key) continue;
     if (!selected.has(key)) continue;
     next.push(stop);
     included.add(key);
