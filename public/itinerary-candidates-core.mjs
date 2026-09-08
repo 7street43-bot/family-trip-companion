@@ -5,6 +5,7 @@ function text(value = '', max = 240) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -94,7 +95,8 @@ export function candidateFromCustom(title, customId) {
 
 export function candidateFromStop(stop = {}) {
   if (!stop?.title) return null;
-  const key = candidateKey(stop) || (stop.kind === 'custom' ? `custom:${stop.id}` : '');
+  const legacyCustomKey = stop.kind === 'custom' && stop.id ? `custom:${stop.id}` : '';
+  const key = stop.candidateKey || (stop.entityId ? `entity:${stop.entityId}` : stop.placeId ? `place:${stop.placeId}` : legacyCustomKey) || candidateKey(stop);
   if (!key) return null;
   return normalizeCandidate({
     key,
