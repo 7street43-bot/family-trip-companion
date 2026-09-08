@@ -51,13 +51,13 @@ jobs:
           node --test tests/journal-j1g-runtime.test.mjs
           node --test tests/journal-j1g-preview-demo.test.mjs
           node --test tests/journal-j1f-ui.test.mjs
-          node --input-type=module -e "import('./public/journal-stable-layout.mjs').then(m=>{if(m.__test.VERSION!=='4.5.0-phase1.6-j1g.8')process.exit(1)})"
-      - name: Security packaging navigation fixed-viewport and observer-loop invariants
+          node --input-type=module -e "import('./public/journal-stable-layout.mjs').then(m=>{if(m.__test.VERSION!=='4.5.0-phase1.6-j1g.9')process.exit(1)})"
+      - name: Security packaging persistent-nav and observer-loop invariants
         run: |
           set -euo pipefail
-          grep -Fq "4.5.0-phase1.6-j1g.8" public/version.json
-          grep -Fq "4.5.0-phase1.6-j1g.8" public/index.html
-          grep -Fq "twin-trip-v4.5.0-phase1.6-j1g.8" public/sw.js
+          grep -Fq "4.5.0-phase1.6-j1g.9" public/version.json
+          grep -Fq "4.5.0-phase1.6-j1g.9" public/index.html
+          grep -Fq "twin-trip-v4.5.0-phase1.6-j1g.9" public/sw.js
           grep -Fq 'journal-media-ui.mjs' public/index.html
           grep -Fq 'journal-media-preview-demo.mjs' public/index.html
           grep -Fq 'journal-media.css' public/index.html
@@ -90,9 +90,12 @@ jobs:
           ! grep -Fq 'n.disabled=!fab()' public/journal-nav-bridge.mjs
           grep -Fq 'n.dataset.pending!==p' public/journal-nav-bridge.mjs
           grep -Fq 'n.dataset.pending!==undefined' public/journal-nav-bridge.mjs
-          grep -Fq 'height:100dvh' public/journal-stable.css
-          grep -Fq 'min-height:100dvh' public/journal-stable.css
-          grep -Fq 'max-height:100dvh' public/journal-stable.css
+          grep -Fq 'closeJournalForAppNav' public/journal-nav-bridge.mjs
+          grep -Fq "o.querySelector('[data-journal-close]')" public/journal-nav-bridge.mjs
+          grep -Fq "bottom?.addEventListener('click',ev=>{closeJournalForAppNav(ev.target);},true)" public/journal-nav-bridge.mjs
+          grep -Fq 'bottom:calc(var(--nav-h,72px) + env(safe-area-inset-bottom))' public/journal-stable.css
+          grep -Fq 'z-index:49' public/journal-stable.css
+          grep -Fq 'height:100%;min-height:100%;max-height:100%' public/journal-stable.css
           grep -Fq 'height:48px' public/journal-stable.css
           grep -Fq 'align-items:stretch' public/journal-stable.css
           grep -Fq 'resetJournalScroll' public/journal-stable-layout.mjs
@@ -127,7 +130,7 @@ jobs:
           test -f public/lib/journal-media-supabase-transport.mjs
           ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs public/journal-stable-layout.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
       - name: Result
-        run: echo 'J1G PHOTO ALBUM + JOURNAL OBSERVER LOOP GUARD = PASS'
+        run: echo 'J1G PHOTO ALBUM + PERSISTENT APP NAV + OBSERVER LOOP GUARD = PASS'
 
   preview-smoke:
     needs: contract
@@ -148,7 +151,7 @@ jobs:
             sleep 5
           done
           test "$ok" = 1 || { echo 'J1G Preview did not reach expected version'; exit 1; }
-      - name: Album journal-nav fixed-viewport and observer-guard asset delivery
+      - name: Album persistent-nav and observer-guard asset delivery
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
@@ -157,7 +160,7 @@ jobs:
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
           curl --fail --silent --show-error --location "$base/?j1g=$GITHUB_SHA" -o /tmp/index.html
-          grep -Fq '4.5.0-phase1.6-j1g.8' /tmp/index.html
+          grep -Fq '4.5.0-phase1.6-j1g.9' /tmp/index.html
           grep -Fq 'journal-media-ui.mjs' /tmp/index.html
           grep -Fq 'journal-media-preview-demo.mjs' /tmp/index.html
           grep -Fq 'journal-media.css' /tmp/index.html
@@ -169,18 +172,23 @@ jobs:
           grep -Fq 'data-journal-nav' /tmp/index.html
           ! grep -Fq 'data-view="journal"' /tmp/index.html
           curl --fail --silent --show-error --location "$base/journal-stable.css?j1g=$GITHUB_SHA" -o /tmp/stable.css
-          grep -Fq 'height:100dvh' /tmp/stable.css
+          grep -Fq 'bottom:calc(var(--nav-h,72px) + env(safe-area-inset-bottom))' /tmp/stable.css
+          grep -Fq 'z-index:49' /tmp/stable.css
+          grep -Fq 'height:100%;min-height:100%;max-height:100%' /tmp/stable.css
           curl --fail --silent --show-error --location "$base/journal-stable-layout.mjs?j1g=$GITHUB_SHA" -o /tmp/stable.mjs
-          grep -Fq "4.5.0-phase1.6-j1g.8" /tmp/stable.mjs
+          grep -Fq "4.5.0-phase1.6-j1g.9" /tmp/stable.mjs
           grep -Fq 'setTextIfChanged' /tmp/stable.mjs
           grep -Fq 'el.textContent!==text' /tmp/stable.mjs
           grep -Fq 'resetJournalScroll' /tmp/stable.mjs
           curl --fail --silent --show-error --location "$base/journal-media-ui.mjs?j1g=$GITHUB_SHA" -o /tmp/media-ui.mjs
+          grep -Fq "4.5.0-phase1.6-j1g.9" /tmp/media-ui.mjs
           grep -Fq 'if(small.textContent!==next)small.textContent=next' /tmp/media-ui.mjs
           curl --fail --silent --show-error --location "$base/journal-media-preview-demo.mjs?j1g=$GITHUB_SHA" -o /tmp/preview-demo.mjs
+          grep -Fq "4.5.0-phase1.6-j1g.9" /tmp/preview-demo.mjs
           grep -Fq 'if(small.textContent!==next)small.textContent=next' /tmp/preview-demo.mjs
           curl --fail --silent --show-error --location "$base/journal-nav-bridge.mjs?j1g=$GITHUB_SHA" -o /tmp/nav-bridge.mjs
           grep -Fq 'n.dataset.pending!==p' /tmp/nav-bridge.mjs
+          grep -Fq 'closeJournalForAppNav' /tmp/nav-bridge.mjs
       - name: Preview remains write-safe
         run: |
           set -euo pipefail
@@ -192,4 +200,4 @@ jobs:
           ! grep -Fq 'uploadPhoto' /tmp/preview-demo.mjs
           ! grep -Fq 'mediaSignedUrl' /tmp/preview-demo.mjs
       - name: Result
-        run: echo 'J1G PREVIEW JOURNAL + PHOTO UX + OBSERVER LOOP GUARD DELIVERY = PASS'
+        run: echo 'J1G PREVIEW JOURNAL + PERSISTENT APP NAV + PHOTO UX + OBSERVER GUARD = PASS'
