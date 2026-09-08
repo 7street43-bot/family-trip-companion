@@ -2,12 +2,12 @@ importScripts('./runtime-config.js');
 const CACHE = globalThis.TwinRuntime?.cache;
 if(!CACHE) throw new Error('runtime cache identity missing');
 const CORE_PATHS = new Set([
-  '/', '/index.html', '/runtime-config.js', '/update-manager.js', '/update-manager.css', '/app.css', '/journal.css', '/journal-media.css', '/journal-nav.css', '/journal-stable.css', '/db.js', '/cloud-sync.js', '/journal-shell.mjs', '/journal-browser.mjs', '/journal-ui.mjs', '/journal-nav-bridge.mjs', '/journal-media-ui.mjs', '/journal-media-preview-demo.mjs', '/journal-stable-layout.mjs',
+  '/', '/index.html', '/runtime-config.js', '/update-manager.js', '/update-manager.css', '/app.css', '/itinerary-v2.css', '/itinerary-v2-core.mjs', '/itinerary-v2.mjs', '/journal.css', '/journal-media.css', '/journal-nav.css', '/journal-stable.css', '/db.js', '/cloud-sync.js', '/journal-shell.mjs', '/journal-browser.mjs', '/journal-ui.mjs', '/journal-nav-bridge.mjs', '/journal-media-ui.mjs', '/journal-media-preview-demo.mjs', '/journal-stable-layout.mjs',
   '/lib/journal-client.mjs', '/lib/journal-supabase-transport.mjs', '/lib/journal-media-client.mjs', '/lib/journal-media-supabase-transport.mjs',
   '/app.js', '/manifest.webmanifest', '/seed-data.json', '/version.json', '/decision-metadata.json'
 ]);
 const PRECACHE = [
-  './index.html', './runtime-config.js', './update-manager.js', './update-manager.css', './app.css', './journal.css', './journal-media.css', './journal-nav.css', './journal-stable.css', './db.js', './cloud-sync.js', './journal-shell.mjs', './journal-browser.mjs', './journal-ui.mjs', './journal-nav-bridge.mjs', './journal-media-ui.mjs', './journal-media-preview-demo.mjs', './journal-stable-layout.mjs',
+  './index.html', './runtime-config.js', './update-manager.js', './update-manager.css', './app.css', './itinerary-v2.css', './itinerary-v2-core.mjs', './itinerary-v2.mjs', './journal.css', './journal-media.css', './journal-nav.css', './journal-stable.css', './db.js', './cloud-sync.js', './journal-shell.mjs', './journal-browser.mjs', './journal-ui.mjs', './journal-nav-bridge.mjs', './journal-media-ui.mjs', './journal-media-preview-demo.mjs', './journal-stable-layout.mjs',
   './lib/journal-client.mjs', './lib/journal-supabase-transport.mjs', './lib/journal-media-client.mjs', './lib/journal-media-supabase-transport.mjs', './app.js',
   './manifest.webmanifest', './seed-data.json', './version.json', './decision-metadata.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
