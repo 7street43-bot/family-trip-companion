@@ -19,12 +19,39 @@ function autoTitle(date) {
   return `${Number(m)}/${Number(d)} 一日遊`;
 }
 
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function stopCandidateKey(stop = {}) {
   if (stop.candidateKey) return String(stop.candidateKey);
   if (stop.entityId) return `entity:${stop.entityId}`;
   if (stop.placeId) return `place:${stop.placeId}`;
   if (stop.kind === 'custom' && stop.id) return `custom:${stop.id}`;
   return '';
+}
+
+export function normalizeOrigin(origin = {}) {
+  const latitude = numberOrNull(origin.latitude);
+  const longitude = numberOrNull(origin.longitude);
+  return {
+    label: String(origin.label || '家').trim().slice(0, 80) || '家',
+    address: String(origin.address || '').trim().slice(0, 260),
+    placeId: String(origin.placeId || '').trim().slice(0, 180) || null,
+    latitude: latitude !== null && latitude >= -90 && latitude <= 90 ? latitude : null,
+    longitude: longitude !== null && longitude >= -180 && longitude <= 180 ? longitude : null
+  };
+}
+
+function cloneRoutePlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  return {
+    ...plan,
+    orderKeys: Array.isArray(plan.orderKeys) ? [...plan.orderKeys] : [],
+    legs: Array.isArray(plan.legs) ? plan.legs.map(leg => ({ ...leg })) : []
+  };
 }
 
 export function createTrip(input = {}) {
@@ -38,8 +65,10 @@ export function createTrip(input = {}) {
     title: String(input.title || '').trim() || autoTitle(date),
     date,
     departureTime: input.departureTime || '09:00',
+    origin: normalizeOrigin(input.origin || {}),
     stops: Array.isArray(input.stops) ? input.stops.map((s, i) => normalizeStop(s, i)) : [],
     plannerInput: input.plannerInput && typeof input.plannerInput === 'object' ? { ...input.plannerInput } : null,
+    routePlan: cloneRoutePlan(input.routePlan),
     createdAt: input.createdAt || now,
     updatedAt: now
   };
@@ -60,12 +89,12 @@ export function normalizeStop(stop = {}, index = 0) {
     placeId,
     title: String(stop.title || '').trim() || '未命名地點',
     entityType: stop.entityType || 'attraction',
-    latitude: Number.isFinite(stop.latitude) ? stop.latitude : null,
-    longitude: Number.isFinite(stop.longitude) ? stop.longitude : null,
+    latitude: numberOrNull(stop.latitude),
+    longitude: numberOrNull(stop.longitude),
     address: String(stop.address || ''),
     googleMapsUrl: String(stop.googleMapsUrl || ''),
-    rating: Number.isFinite(stop.rating) ? stop.rating : null,
-    userRatingCount: Number.isFinite(stop.userRatingCount) ? stop.userRatingCount : null,
+    rating: numberOrNull(stop.rating),
+    userRatingCount: numberOrNull(stop.userRatingCount),
     plannedTime: stop.plannedTime || '',
     note: String(stop.note || ''),
     order: index
@@ -78,11 +107,13 @@ export function stopFromEntity(entity, index = 0) {
     candidateKey: `entity:${entity.id}`,
     source: entity.favorite ? 'favorite' : 'saved',
     entityId: entity.id,
+    placeId: entity.googlePlaceId || null,
     title: entity.name,
     entityType: entity.entityType,
     latitude: entity.latitude,
     longitude: entity.longitude,
-    address: [entity.county || entity.cityRaw, entity.district].filter(Boolean).join(' ')
+    address: entity.address || [entity.county || entity.cityRaw, entity.district].filter(Boolean).join(' '),
+    googleMapsUrl: entity.googleMapsUrl || ''
   }, index);
 }
 
@@ -108,6 +139,10 @@ export function customStop(title, index = 0) {
   return normalizeStop({ kind: 'custom', title }, index);
 }
 
+export function withOrigin(trip, origin = {}) {
+  return createTrip({ ...trip, origin:normalizeOrigin(origin), routePlan:null, createdAt:trip.createdAt });
+}
+
 export function withEntities(trip, entities = []) {
   const existing = new Set((trip.stops || []).map(s => s.entityId).filter(Boolean));
   const additions = [];
@@ -116,7 +151,7 @@ export function withEntities(trip, entities = []) {
     existing.add(entity.id);
     additions.push(stopFromEntity(entity, trip.stops.length + additions.length));
   }
-  return createTrip({ ...trip, stops: [...trip.stops, ...additions], createdAt: trip.createdAt });
+  return createTrip({ ...trip, stops: [...trip.stops, ...additions], routePlan:null, createdAt: trip.createdAt });
 }
 
 export function withCandidates(trip, candidates = [], selectionOrder = []) {
@@ -125,17 +160,13 @@ export function withCandidates(trip, candidates = [], selectionOrder = []) {
   const next = [];
   const included = new Set();
 
-  // Existing stop order wins. This preserves manual reordering when the user returns
-  // to the candidate pool, changes the selection, then confirms again.
   for (const stop of trip.stops || []) {
     const key = stopCandidateKey(stop);
-    if (!key) continue;
-    if (!selected.has(key)) continue;
+    if (!key || !selected.has(key)) continue;
     next.push(stop);
     included.add(key);
   }
 
-  // Newly selected candidates are appended in the order in which the user selected them.
   for (const key of selectionOrder) {
     if (included.has(key)) continue;
     const candidate = byKey.get(key);
@@ -144,13 +175,13 @@ export function withCandidates(trip, candidates = [], selectionOrder = []) {
     included.add(key);
   }
 
-  return createTrip({ ...trip, stops: next, createdAt: trip.createdAt });
+  return createTrip({ ...trip, stops: next, routePlan:null, createdAt: trip.createdAt });
 }
 
 export function withCustomStop(trip, title) {
   const clean = String(title || '').trim();
   if (!clean) return trip;
-  return createTrip({ ...trip, stops: [...trip.stops, customStop(clean, trip.stops.length)], createdAt: trip.createdAt });
+  return createTrip({ ...trip, stops: [...trip.stops, customStop(clean, trip.stops.length)], routePlan:null, createdAt: trip.createdAt });
 }
 
 export function moveStop(trip, from, to) {
@@ -158,14 +189,14 @@ export function moveStop(trip, from, to) {
   if (from < 0 || to < 0 || from >= stops.length || to >= stops.length || from === to) return trip;
   const [moved] = stops.splice(from, 1);
   stops.splice(to, 0, moved);
-  return createTrip({ ...trip, stops, createdAt: trip.createdAt });
+  return createTrip({ ...trip, stops, routePlan:null, createdAt: trip.createdAt });
 }
 
 export function removeStop(trip, index) {
   const stops = [...(trip.stops || [])];
   if (index < 0 || index >= stops.length) return trip;
   stops.splice(index, 1);
-  return createTrip({ ...trip, stops, createdAt: trip.createdAt });
+  return createTrip({ ...trip, stops, routePlan:null, createdAt: trip.createdAt });
 }
 
 export function isV2Trip(trip) {
