@@ -20,9 +20,9 @@ assert.equal(trip.title, '9/12 一日遊');
 assert.equal(trip.departureTime, '09:00');
 
 const picked = withEntities(trip, [e1,e2,e3,e1]);
-assert.equal(picked.stops.length, 4, 'same call preserves duplicate input only once per existing set contract check');
+assert.equal(picked.stops.length, 3, 'duplicate entity in the same selection must be collapsed');
 const deduped = withEntities(picked, [e1,e2]);
-assert.equal(deduped.stops.length, 4, 'existing entity ids must not be duplicated later');
+assert.equal(deduped.stops.length, 3, 'existing entity ids must not be duplicated later');
 
 const custom = withCustomStop(deduped, '回程買牛舌餅');
 assert.equal(custom.stops.at(-1).kind, 'custom');
