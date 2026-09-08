@@ -4,6 +4,7 @@ import {
   candidateFromEntity,
   candidateFromExternal,
   candidateFromCustom,
+  candidateFromStop,
   mergeCandidatePool,
   toggleSelectionOrder,
   selectedCandidates
@@ -28,7 +29,18 @@ assert.ok(plan.queries.some(q => q.includes('宜蘭') && q.includes('動物')), 
 const saved = candidateFromEntity({ id:'e1', name:'斑比山丘', entityType:'attraction', favorite:true, county:'宜蘭縣' });
 const externalSameTitle = candidateFromExternal({ placeId:'p1', title:'斑比山丘', formattedAddress:'宜蘭縣冬山鄉', rating:4.7, userRatingCount:1200 });
 const external2 = candidateFromExternal({ placeId:'p2', title:'張美阿嬤農場', formattedAddress:'宜蘭縣三星鄉', rating:4.6, userRatingCount:900 });
+const nullNumeric = candidateFromExternal({ placeId:'nulls', title:'空值測試', formattedAddress:'宜蘭縣' });
+assert.equal(nullNumeric.latitude, null, 'missing latitude must stay null, not zero');
+assert.equal(nullNumeric.longitude, null, 'missing longitude must stay null, not zero');
+assert.equal(nullNumeric.rating, null, 'missing rating must stay null, not zero');
+assert.equal(nullNumeric.userRatingCount, null, 'missing rating count must stay null, not zero');
+
 const custom = candidateFromCustom('回程買牛舌餅', 'manual-1');
+const legacyCustom = candidateFromStop({ id:'legacy-custom-1', kind:'custom', title:'舊版手動景點', entityType:'attraction' });
+assert.equal(legacyCustom.key, 'custom:legacy-custom-1', 'J2A-0 custom stop must keep a stable candidate key');
+
+const normalizedLegacyTrip = createTrip({ date:'2026-09-12', stops:[{ id:'legacy-custom-1', kind:'custom', title:'舊版手動景點' }] });
+assert.equal(normalizedLegacyTrip.stops[0].candidateKey, 'custom:legacy-custom-1', 'legacy custom stop normalization must backfill candidateKey');
 
 const pool = mergeCandidatePool([saved], [externalSameTitle, external2], [custom]);
 assert.equal(pool.length, 4, 'different stable source ids must remain independent candidates');
