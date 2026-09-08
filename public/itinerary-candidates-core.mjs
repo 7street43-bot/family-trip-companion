@@ -45,11 +45,13 @@ export function candidateFromEntity(entity = {}) {
     key: `entity:${entity.id}`,
     source: entity.favorite ? 'favorite' : 'saved',
     entityId: entity.id,
+    placeId: entity.googlePlaceId || '',
     title: entity.name,
     entityType: entity.entityType || 'attraction',
     latitude: entity.latitude,
     longitude: entity.longitude,
-    address: [entity.county || entity.cityRaw, entity.district].filter(Boolean).join(' '),
+    address: entity.address || [entity.county || entity.cityRaw, entity.district].filter(Boolean).join(' '),
+    googleMapsUrl: entity.googleMapsUrl || '',
     favorite: !!entity.favorite,
     tags: entity.tags || []
   });
