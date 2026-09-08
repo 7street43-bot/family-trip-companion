@@ -1,4 +1,4 @@
-const VERSION='4.5.0-phase1.6-j1g.8';
+const VERSION='4.5.0-phase1.6-j1g.9';
 
 function journalBody(){return document.querySelector('#journalOverlay .journal-body');}
 function setTextIfChanged(el,text){if(el&&el.textContent!==text)el.textContent=text;}
@@ -29,8 +29,7 @@ function mount(){
   document.addEventListener('click',ev=>{
     if(ev.target.closest?.('[data-journal-tab]'))setTimeout(afterTabChange,0);
   });
-  // J1G.8: every observer-driven text write in the Journal stack must be
-  // idempotent. This module writes only when the visible value actually differs.
+  // Every observer-driven text write in the Journal stack is idempotent.
   const observer=new MutationObserver(()=>queueMicrotask(syncVisibleVersion));
   observer.observe(document.body,{childList:true,subtree:true});
   syncVisibleVersion();
