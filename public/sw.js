@@ -1,4 +1,4 @@
-const CACHE = 'twin-trip-v4.5.0-phase1.6-j1g.7';
+const CACHE = 'twin-trip-v4.5.0-phase1.6-j1g.8';
 const CORE_PATHS = new Set([
   '/', '/index.html', '/app.css', '/journal.css', '/journal-media.css', '/journal-nav.css', '/journal-stable.css', '/db.js', '/cloud-sync.js', '/journal-browser.mjs', '/journal-ui.mjs', '/journal-nav-bridge.mjs', '/journal-media-ui.mjs', '/journal-media-preview-demo.mjs', '/journal-stable-layout.mjs',
   '/lib/journal-client.mjs', '/lib/journal-supabase-transport.mjs', '/lib/journal-media-client.mjs', '/lib/journal-media-supabase-transport.mjs',
