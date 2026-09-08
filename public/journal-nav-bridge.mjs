@@ -5,7 +5,7 @@ function fab(){return document.getElementById('journalFab');}
 function overlay(){return document.getElementById('journalOverlay');}
 function appNavButtons(){return [...document.querySelectorAll('#bottomNav .nav-item')];}
 function currentAppNav(){return appNavButtons().find(b=>b!==nav()&&b.classList.contains('active'))||null;}
-function syncPending(){const n=nav(),f=fab();if(!n)return;const p=f?.dataset?.pending;if(p)n.dataset.pending=p;else delete n.dataset.pending;}
+function syncPending(){const n=nav(),f=fab();if(!n)return;const p=f?.dataset?.pending;if(p){if(n.dataset.pending!==p)n.dataset.pending=p;}else if(n.dataset.pending!==undefined){delete n.dataset.pending;}}
 function setJournalActive(active){const n=nav();if(!n)return;if(active){if(!state.previous)state.previous=currentAppNav();appNavButtons().forEach(b=>b.classList.toggle('active',b===n));}else{n.classList.remove('active');const restore=state.previous&&document.contains(state.previous)?state.previous:currentAppNav();if(restore)restore.classList.add('active');state.previous=null;}}
 function syncOverlay(){const o=overlay();setJournalActive(!!o&&!o.hidden);}
 function waitForFab(timeoutMs=2000){return new Promise(resolve=>{const existing=fab();if(existing)return resolve(existing);const started=Date.now();const timer=setInterval(()=>{const f=fab();if(f){clearInterval(timer);resolve(f);return;}if(Date.now()-started>=timeoutMs){clearInterval(timer);resolve(null);}},25);});}
@@ -15,4 +15,4 @@ function mount(){if(state.mounted)return;state.mounted=true;const n=nav();if(!n)
 
 if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
 
-export const __test={setJournalActive,openJournal,waitForFab};
+export const __test={setJournalActive,openJournal,waitForFab,syncPending};
