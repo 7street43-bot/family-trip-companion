@@ -1,0 +1,93 @@
+name: J1K Frontend Stability
+
+on:
+  push:
+    branches: [j1k-stability-core, preview]
+    paths:
+      - 'public/**'
+      - 'scripts/prepare-site.mjs'
+      - 'tests/j1k-*.mjs'
+      - '.github/workflows/j1k-frontend-stability.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j1k-frontend-stability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and existing contracts
+        run: |
+          set -euo pipefail
+          node --check public/app.js
+          node --check public/sw.js
+          node --check public/update-manager.js
+          node --check public/journal-shell.mjs
+          node --check public/journal-ui.mjs
+          node --check public/journal-nav-bridge.mjs
+          node --check public/journal-media-ui.mjs
+          node --check public/journal-media-preview-demo.mjs
+          node --check public/journal-stable-layout.mjs
+          node --test tests/j1k-journal-shell.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-runtime.test.mjs
+          node --test tests/journal-j1g-preview-demo.test.mjs
+      - name: Single-version and deterministic-state invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
+          const ctx={globalThis:{}};vm.createContext(ctx);vm.runInContext(fs.readFileSync('public/runtime-config.js','utf8'),ctx);
+          if(ctx.globalThis.TwinRuntime.version!==v.version) throw new Error('runtime-config version drift');
+          if(ctx.globalThis.TwinRuntime.cache!==v.cache) throw new Error('runtime-config cache drift');
+          const app=fs.readFileSync('public/app.js','utf8');
+          if(!app.includes(`const APP_RUNTIME_VERSION = '${v.version}';`)) throw new Error('app runtime version not generated from version.json');
+          if(app.includes("sw.js?v=4.5.0-phase1.2")) throw new Error('legacy SW registration survived build');
+          if(!app.includes('TwinUpdateManager.register')) throw new Error('update manager does not own SW registration');
+          const html=fs.readFileSync('public/index.html','utf8');
+          if(/phase1\./.test(html)) throw new Error('index.html contains duplicated release version');
+          for(const needle of ['runtime-config.js','update-manager.js','journal-shell.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle}`);
+          const journalFiles=['public/journal-ui.mjs','public/journal-nav-bridge.mjs','public/journal-media-ui.mjs','public/journal-media-preview-demo.mjs','public/journal-stable-layout.mjs'];
+          for(const file of journalFiles){const src=fs.readFileSync(file,'utf8');if(src.includes('MutationObserver'))throw new Error(`${file}: MutationObserver is forbidden in J1K Journal runtime`);}
+          NODE
+          grep -Fq "importScripts('./runtime-config.js')" public/sw.js
+          grep -Fq "SKIP_WAITING" public/sw.js
+          ! grep -Fq ".then(() => self.skipWaiting())" public/sw.js
+          grep -Fq "已有新版可用" public/update-manager.js
+          grep -Fq "journalShell.on('rendered'" public/journal-media-ui.mjs
+          grep -Fq "journalShell.on('rendered'" public/journal-media-preview-demo.mjs
+          grep -Fq "journalShell.registerCommands" public/journal-ui.mjs
+          ! grep -R -E 'SERVICE_ROLE|service_role' public/journal-*.mjs
+      - name: Result
+        run: echo 'J1K SINGLE VERSION + DETERMINISTIC JOURNAL STATE = PASS'
+
+  webkit-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start local publish server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/j1k-http.log 2>&1 &
+          echo $! > /tmp/j1k-http.pid
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/j1k-http.log
+          exit 1
+      - name: Mobile and desktop WebKit interaction gate
+        env:
+          J1K_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j1k-webkit-e2e.mjs
+      - name: Result
+        run: echo 'J1K WEBKIT REAL INTERACTION GATE = PASS'
