@@ -147,8 +147,10 @@ function decorateCurrentScreen(){
   if(root?.querySelector('[data-it2-screen="arrange"]')) void decorateArrange();
 }
 
+// Itinerary V2 swaps the whole #app surface per screen. Observe only those root-level
+// swaps so our own origin decorations cannot recursively trigger the observer.
 const observer=new MutationObserver(()=>decorateCurrentScreen());
-if(root) observer.observe(root,{childList:true,subtree:true});
+if(root) observer.observe(root,{childList:true});
 
 settingsButton?.addEventListener('click',()=>{resetSearch();setTimeout(()=>void injectSettingsBlock(),0);});
 
