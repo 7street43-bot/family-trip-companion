@@ -13,6 +13,7 @@ on:
       - 'scripts/prepare-site.mjs'
       - 'tests/j2a-*.mjs'
       - 'tests/j2b-*.mjs'
+      - '.github/workflows/j2a-itinerary-v2.yml'
       - '.github/workflows/j2b-origin.yml'
   workflow_dispatch:
 
