@@ -1,0 +1,83 @@
+name: J2A Itinerary V2
+
+on:
+  push:
+    branches: [j2a-itinerary-v2, preview]
+    paths:
+      - 'public/itinerary-v2*'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'public/version.json'
+      - 'tests/j2a-*.mjs'
+      - '.github/workflows/j2a-itinerary-v2.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j2a-itinerary-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and V2 contract
+        run: |
+          set -euo pipefail
+          node --check public/itinerary-v2-core.mjs
+          node --check public/itinerary-v2.mjs
+          node --check public/sw.js
+          node --test tests/j2a-itinerary-v2.test.mjs
+      - name: Isolation and wiring invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('public/index.html','utf8');
+          const sw=fs.readFileSync('public/sw.js','utf8');
+          const ui=fs.readFileSync('public/itinerary-v2.mjs','utf8');
+          const core=fs.readFileSync('public/itinerary-v2-core.mjs','utf8');
+          const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
+          for(const needle of ['itinerary-v2.css','itinerary-v2.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
+          for(const needle of ['itinerary-v2.css','itinerary-v2-core.mjs','itinerary-v2.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
+          if(!core.includes("const MODEL = 'itinerary-v2'")) throw new Error('V2 model marker missing');
+          if(!core.includes('const MODEL_VERSION = 2')) throw new Error('V2 model version missing');
+          if(!ui.includes("filter(isV2Trip)")) throw new Error('V2 UI does not isolate legacy itineraries');
+          if(!ui.includes("[data-view=\"trips\"]")) throw new Error('V2 does not intercept trips navigation');
+          if(!ui.includes('data-it2-to-pick') || !ui.includes('data-it2-to-arrange') || !ui.includes('data-it2-save')) throw new Error('three-step first-use flow incomplete');
+          if(v.channel!=='J2A') throw new Error(`wrong channel:${v.channel}`);
+          NODE
+      - name: Existing frontend regression contracts
+        run: |
+          set -euo pipefail
+          node --test tests/j1k-journal-shell.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-runtime.test.mjs
+      - name: Result
+        run: echo 'J2A ISOLATED ITINERARY V2 CONTRACT = PASS'
+
+  webkit-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start local publish server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/j2a-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/j2a-http.log
+          exit 1
+      - name: Mobile and desktop first-use gate
+        env:
+          J2A_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2a-webkit-e2e.mjs
+      - name: Result
+        run: echo 'J2A WEBKIT FIRST-USE UX GATE = PASS'
