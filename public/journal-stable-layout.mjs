@@ -1,4 +1,4 @@
-const VERSION='4.5.0-phase1.6-j1g.7';
+const VERSION='4.5.0-phase1.6-j1g.8';
 
 function journalBody(){return document.querySelector('#journalOverlay .journal-body');}
 function setTextIfChanged(el,text){if(el&&el.textContent!==text)el.textContent=text;}
@@ -29,9 +29,8 @@ function mount(){
   document.addEventListener('click',ev=>{
     if(ev.target.closest?.('[data-journal-tab]'))setTimeout(afterTabChange,0);
   });
-  // J1G.7: body mutations may include our own version text updates. Only writing
-  // when text actually differs prevents a MutationObserver self-trigger loop
-  // from starving the main App async boot/render path on iOS Safari.
+  // J1G.8: every observer-driven text write in the Journal stack must be
+  // idempotent. This module writes only when the visible value actually differs.
   const observer=new MutationObserver(()=>queueMicrotask(syncVisibleVersion));
   observer.observe(document.body,{childList:true,subtree:true});
   syncVisibleVersion();
