@@ -2,7 +2,7 @@ name: J2A Itinerary V2
 
 on:
   push:
-    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, j2a-home-bootstrap-fix, preview]
+    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, j2a-home-bootstrap-fix, j2a-fast-start, preview]
     paths:
       - 'public/itinerary-v2*'
       - 'public/itinerary-candidates-core.mjs'
@@ -61,11 +61,19 @@ jobs:
           if(!candidates.includes("const CANDIDATE_MODEL = 'itinerary-candidate-v1'")) throw new Error('candidate model marker missing');
           if(!provider.includes("path: '/api/itinerary-candidates'")) throw new Error('candidate endpoint path missing');
           if(!provider.includes('aiAdapterReady: true')) throw new Error('planner adapter extension point missing');
-          const earlyPaint="if (!app.childElementCount && state.view === 'home') render();";
-          const migration='await migrateGeographyIfNeeded();';
-          if(!app.includes(earlyPaint)) throw new Error('early-home-paint missing from prepared runtime');
-          if(app.indexOf(earlyPaint) > app.indexOf(migration)) throw new Error('home paint occurs after migration gate');
-          if(v.channel!=='J2A' || v.version!=='4.5.0-phase1.8-j2a.2') throw new Error(`wrong J2A-2 runtime:${v.version}/${v.channel}`);
+          for(const needle of [
+            'async function reloadData({runMigrations=true}={})',
+            'await reloadData({runMigrations:false})',
+            'function scheduleIdleTask(task',
+            'function scheduleInboxAutomationWhenSafe(delayMs=1200)',
+            "document.querySelector('[data-it2-screen]')",
+            "document.querySelector('#journalNavBtn.active')",
+            "scheduleIdleTask(()=>window.TwinUpdateManager?.register?.(),{delay:1200,timeout:4000})"
+          ]) if(!app.includes(needle)) throw new Error(`J2A-3 startup marker missing: ${needle}`);
+          const fastRead=app.indexOf('await reloadData({runMigrations:false})');
+          const idleMaintenance=app.indexOf("scheduleIdleTask(async()=>{\n        await reloadData();");
+          if(fastRead<0 || idleMaintenance<0 || fastRead>idleMaintenance) throw new Error('startup migrations are not deferred after fast local read');
+          if(v.channel!=='J2A' || v.version!=='4.5.0-phase1.8-j2a.3') throw new Error(`wrong J2A-3 runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts
         run: |
@@ -74,7 +82,7 @@ jobs:
           node --test tests/journal-j1f-ui.test.mjs
           node --test tests/journal-j1g-runtime.test.mjs
       - name: Result
-        run: echo 'J2A-2 HOME BOOTSTRAP + CANDIDATE PROVIDER CONTRACT = PASS'
+        run: echo 'J2A-3 IDLE STARTUP ISOLATION + CANDIDATE PROVIDER CONTRACT = PASS'
 
   webkit-e2e:
     runs-on: ubuntu-latest
@@ -98,7 +106,7 @@ jobs:
           J2A_BASE_URL: http://127.0.0.1:4173
         run: node tests/j2a-webkit-e2e.mjs
       - name: Result
-        run: echo 'J2A-2 WEBKIT CANDIDATE POOL UX GATE = PASS'
+        run: echo 'J2A-3 WEBKIT CANDIDATE POOL UX GATE = PASS'
 
   live-preview-provider-smoke:
     if: github.ref == 'refs/heads/preview'
@@ -153,4 +161,4 @@ jobs:
           console.log(`live_candidates=${body.candidates.length} queries=${body.queriesTried.length} sample=${body.candidates.slice(0,3).map(x=>x.title).join(' | ')}`);
           NODE
       - name: Result
-        run: echo 'J2A-2 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
+        run: echo 'J2A-3 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
