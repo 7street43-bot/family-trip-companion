@@ -1,5 +1,6 @@
 const MODEL = 'itinerary-v2';
 const MODEL_VERSION = 2;
+const LOCATION_KINDS = new Set(['home', 'hotel', 'place', 'custom']);
 
 function localDateISO(date = new Date()) {
   const y = date.getFullYear();
@@ -27,9 +28,38 @@ function stopCandidateKey(stop = {}) {
   return '';
 }
 
+export function normalizeTripLocation(location, fallbackKind = 'place') {
+  if (!location || typeof location !== 'object') return null;
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+  const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const placeId = String(location.placeId || '').trim();
+  const address = String(location.address || location.formattedAddress || '').trim();
+  if (!placeId && !hasCoordinates && !address) return null;
+  const requestedKind = String(location.kind || '').trim();
+  const kind = LOCATION_KINDS.has(requestedKind) ? requestedKind : (LOCATION_KINDS.has(fallbackKind) ? fallbackKind : 'place');
+  const defaultLabel = kind === 'home' ? '家' : kind === 'hotel' ? '住宿' : '出發地';
+  return {
+    kind,
+    label: String(location.label || location.displayName || defaultLabel).trim() || defaultLabel,
+    placeId: placeId || null,
+    latitude: hasCoordinates ? latitude : null,
+    longitude: hasCoordinates ? longitude : null,
+    address,
+    googleMapsUrl: String(location.googleMapsUrl || location.googleMapsUri || '').trim(),
+    source: String(location.source || (placeId ? 'google-places' : 'manual')).trim() || 'manual'
+  };
+}
+
 export function createTrip(input = {}) {
   const now = new Date().toISOString();
   const date = input.date || localDateISO();
+  // Only brand-new drafts may inherit the asynchronously loaded default Home.
+  // Existing J2A/J2B rows always preserve their own explicit (or missing) origin.
+  const originInput = input.origin !== undefined ? input.origin : (!input.id ? globalThis.TwinTripDefaultOrigin : null);
+  const origin = normalizeTripLocation(originInput, 'home');
+  const destinationInput = input.destination !== undefined ? input.destination : (!input.id ? origin : null);
+  const destination = normalizeTripLocation(destinationInput, origin?.kind || 'home');
   return {
     id: input.id || uid('tripv2'),
     model: MODEL,
@@ -38,6 +68,9 @@ export function createTrip(input = {}) {
     title: String(input.title || '').trim() || autoTitle(date),
     date,
     departureTime: input.departureTime || '09:00',
+    origin,
+    destination,
+    scheduleSchemaVersion: Number.isInteger(input.scheduleSchemaVersion) ? input.scheduleSchemaVersion : null,
     stops: Array.isArray(input.stops) ? input.stops.map((s, i) => normalizeStop(s, i)) : [],
     plannerInput: input.plannerInput && typeof input.plannerInput === 'object' ? { ...input.plannerInput } : null,
     createdAt: input.createdAt || now,
