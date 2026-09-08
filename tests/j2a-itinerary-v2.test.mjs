@@ -1,3 +1,4 @@
+// J2A-0 contract trigger after workflow creation.
 import assert from 'node:assert/strict';
 import {
   createTrip,
