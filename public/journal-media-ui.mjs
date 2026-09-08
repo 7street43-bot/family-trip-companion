@@ -1,6 +1,6 @@
 import journalBinding from './journal-browser.mjs';
 
-const VERSION='4.5.0-phase1.6-j1g.8';
+const VERSION='4.5.0-phase1.6-j1g.9';
 const state={entryId:null,media:[],urls:new Map(),loading:false,message:'',messageType:'',showHidden:false,seq:0};
 const ACCEPTED=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
 const MAX_BYTES=25*1024*1024;
