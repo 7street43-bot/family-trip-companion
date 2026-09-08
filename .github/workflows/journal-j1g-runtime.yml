@@ -51,11 +51,13 @@ jobs:
           node --test tests/journal-j1g-runtime.test.mjs
           node --test tests/journal-j1g-preview-demo.test.mjs
           node --test tests/journal-j1f-ui.test.mjs
-          node --input-type=module -e "import('./public/journal-stable-layout.mjs').then(m=>{if(m.__test.VERSION!=='4.5.0-phase1.6-j1g.6')process.exit(1)})"
-      - name: Security packaging navigation and fixed-viewport invariants
+          node --input-type=module -e "import('./public/journal-stable-layout.mjs').then(m=>{if(m.__test.VERSION!=='4.5.0-phase1.6-j1g.7')process.exit(1)})"
+      - name: Security packaging navigation fixed-viewport and boot invariants
         run: |
           set -euo pipefail
-          grep -Fq "4.5.0-phase1.6-j1g.6" public/version.json
+          grep -Fq "4.5.0-phase1.6-j1g.7" public/version.json
+          grep -Fq "4.5.0-phase1.6-j1g.7" public/index.html
+          grep -Fq "twin-trip-v4.5.0-phase1.6-j1g.7" public/sw.js
           grep -Fq 'journal-media-ui.mjs' public/index.html
           grep -Fq 'journal-media-preview-demo.mjs' public/index.html
           grep -Fq 'journal-media.css' public/index.html
@@ -95,6 +97,9 @@ jobs:
           grep -Fq "body.scrollTop=0" public/journal-stable-layout.mjs
           grep -Fq 'requestAnimationFrame' public/journal-stable-layout.mjs
           grep -Fq '手機紀錄與回顧' public/journal-stable-layout.mjs
+          grep -Fq 'setTextIfChanged' public/journal-stable-layout.mjs
+          grep -Fq 'el.textContent!==text' public/journal-stable-layout.mjs
+          ! grep -Fq 'if(subtitle)subtitle.textContent=' public/journal-stable-layout.mjs
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('public/index.html','utf8');
@@ -107,7 +112,7 @@ jobs:
           test -f public/lib/journal-media-supabase-transport.mjs
           ! grep -R -E 'service_role|SERVICE_ROLE' public/journal-browser.mjs public/journal-media-ui.mjs public/journal-media-preview-demo.mjs public/journal-stable-layout.mjs shared/journal-media-client.mjs shared/journal-media-supabase-transport.mjs
       - name: Result
-        run: echo 'J1G PHOTO ALBUM + JOURNAL FIXED MOBILE VIEWPORT CONTRACT = PASS'
+        run: echo 'J1G PHOTO ALBUM + JOURNAL FIXED MOBILE VIEWPORT + BOOT LOOP GUARD = PASS'
 
   preview-smoke:
     needs: contract
@@ -128,7 +133,7 @@ jobs:
             sleep 5
           done
           test "$ok" = 1 || { echo 'J1G Preview did not reach expected version'; exit 1; }
-      - name: Album journal-nav and fixed-viewport asset delivery
+      - name: Album journal-nav fixed-viewport and boot-guard asset delivery
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
@@ -137,6 +142,7 @@ jobs:
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
           curl --fail --silent --show-error --location "$base/?j1g=$GITHUB_SHA" -o /tmp/index.html
+          grep -Fq '4.5.0-phase1.6-j1g.7' /tmp/index.html
           grep -Fq 'journal-media-ui.mjs' /tmp/index.html
           grep -Fq 'journal-media-preview-demo.mjs' /tmp/index.html
           grep -Fq 'journal-media.css' /tmp/index.html
@@ -150,7 +156,9 @@ jobs:
           curl --fail --silent --show-error --location "$base/journal-stable.css?j1g=$GITHUB_SHA" -o /tmp/stable.css
           grep -Fq 'height:100dvh' /tmp/stable.css
           curl --fail --silent --show-error --location "$base/journal-stable-layout.mjs?j1g=$GITHUB_SHA" -o /tmp/stable.mjs
-          grep -Fq "4.5.0-phase1.6-j1g.6" /tmp/stable.mjs
+          grep -Fq "4.5.0-phase1.6-j1g.7" /tmp/stable.mjs
+          grep -Fq 'setTextIfChanged' /tmp/stable.mjs
+          grep -Fq 'el.textContent!==text' /tmp/stable.mjs
           grep -Fq 'resetJournalScroll' /tmp/stable.mjs
       - name: Preview remains write-safe
         run: |
@@ -163,4 +171,4 @@ jobs:
           ! grep -Fq 'uploadPhoto' /tmp/preview-demo.mjs
           ! grep -Fq 'mediaSignedUrl' /tmp/preview-demo.mjs
       - name: Result
-        run: echo 'J1G PREVIEW JOURNAL FIXED MOBILE VIEWPORT + PHOTO UX DELIVERY = PASS'
+        run: echo 'J1G PREVIEW JOURNAL FIXED MOBILE VIEWPORT + PHOTO UX + BOOT GUARD DELIVERY = PASS'
