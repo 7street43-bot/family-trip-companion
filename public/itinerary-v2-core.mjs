@@ -68,7 +68,12 @@ export function customStop(title, index = 0) {
 
 export function withEntities(trip, entities = []) {
   const existing = new Set((trip.stops || []).map(s => s.entityId).filter(Boolean));
-  const additions = entities.filter(e => e?.id && !existing.has(e.id)).map((e, i) => stopFromEntity(e, trip.stops.length + i));
+  const additions = [];
+  for (const entity of entities) {
+    if (!entity?.id || existing.has(entity.id)) continue;
+    existing.add(entity.id);
+    additions.push(stopFromEntity(entity, trip.stops.length + additions.length));
+  }
   return createTrip({ ...trip, stops: [...trip.stops, ...additions], createdAt: trip.createdAt });
 }
 
