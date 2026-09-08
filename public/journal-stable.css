@@ -1,0 +1,16 @@
+/* J1G.6 | Fixed mobile Journal viewport
+   Mobile Journal is one stable app-height surface. Tabs swap only the scrollable body. */
+.journal-panel{min-height:0}
+.journal-head,.journal-tabs{flex:0 0 auto}
+.journal-tabs button{height:48px;min-height:48px}
+.journal-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+@media (max-width:899px){
+  .journal-overlay{align-items:stretch;justify-content:stretch;padding:0;overscroll-behavior:none}
+  .journal-panel{width:100%;height:100dvh;min-height:100dvh;max-height:100dvh;border-radius:0;box-shadow:none}
+  .journal-head{min-height:76px;box-sizing:border-box;padding-top:calc(14px + env(safe-area-inset-top))}
+  .journal-tabs{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;padding-top:10px}
+  .journal-tabs button{width:100%;height:48px;min-height:48px;padding:0 10px}
+  .journal-body{height:0;flex:1 1 0;padding-top:12px;padding-bottom:calc(22px + env(safe-area-inset-bottom));scroll-behavior:auto}
+  .journal-empty{min-height:156px;box-sizing:border-box;display:grid;place-items:center;align-content:center}
+}

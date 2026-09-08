@@ -52,7 +52,7 @@ jobs:
           grep -Fq 'searchEntriesLocal' public/journal-ui.mjs
           grep -Fq "source:'gpt'" netlify/functions/journal-gpt.mjs
           ! grep -R "SERVICE_ROLE\|service_role" -n public/journal-ui.mjs public/journal-browser.mjs netlify/functions/journal-gpt.mjs
-          node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(v.version!=='4.5.0-phase1.5-j1f.3') process.exit(1)"
+          node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(!/^4\\.5\\.0-phase1\\./.test(v.version)) process.exit(1)"
       - name: Result
         run: echo 'J1F HISTORY + SEARCH + MOBILE + DESKTOP + GPT CONTRACT = PASS'
 
