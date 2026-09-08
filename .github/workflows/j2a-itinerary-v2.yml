@@ -2,7 +2,7 @@ name: J2A Itinerary V2
 
 on:
   push:
-    branches: [j2a-itinerary-v2, preview]
+    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, preview]
     paths:
       - 'public/itinerary-v2*'
       - 'public/itinerary-candidates-core.mjs'
@@ -92,3 +92,58 @@ jobs:
         run: node tests/j2a-webkit-e2e.mjs
       - name: Result
         run: echo 'J2A-1 WEBKIT CANDIDATE POOL UX GATE = PASS'
+
+  live-preview-provider-smoke:
+    if: github.ref == 'refs/heads/preview'
+    needs: [contract, webkit-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for fixed Preview runtime
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+              "$base/version.json?j2a_live=${GITHUB_SHA}" -o /tmp/j2a-version.json \
+              && EXPECTED="$expected" node - <<'NODE'
+          const fs=require('fs');
+          const live=JSON.parse(fs.readFileSync('/tmp/j2a-version.json','utf8')).version;
+          if(live!==process.env.EXPECTED) process.exit(1);
+          NODE
+            then
+              echo "Fixed Preview runtime ready: $expected"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Fixed Preview did not reach the candidate runtime in time.'
+          exit 1
+      - name: Google Places live candidate smoke
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 45 \
+            --retry 1 --retry-all-errors --retry-delay 2 \
+            -X POST "$base/api/itinerary-candidates" \
+            -H 'content-type: application/json' \
+            --data '{"request":"帶小孩去宜蘭一日，想看動物，也要雨天備案","location":"宜蘭","anchor":"斑比山丘","themes":["動物","室內"],"entityType":"attraction","limit":6}' \
+            --output /tmp/j2a-live.json --write-out '%{http_code}')
+          test "$code" = '200' || { echo "candidate API HTTP $code"; cat /tmp/j2a-live.json; exit 1; }
+          node - <<'NODE'
+          const fs=require('fs');
+          const body=JSON.parse(fs.readFileSync('/tmp/j2a-live.json','utf8'));
+          if(body?.planner?.version!=='candidate-planner-v1') throw new Error('planner-version-mismatch');
+          if(body?.planner?.strategy!=='places-query-expansion') throw new Error('planner-strategy-mismatch');
+          if(body?.planner?.aiAdapterReady!==true) throw new Error('ai-adapter-marker-missing');
+          if(!Array.isArray(body?.queriesTried) || body.queriesTried.length<2) throw new Error('query-expansion-not-exercised');
+          if(!Array.isArray(body?.candidates) || body.candidates.length<1) throw new Error('no-live-candidates');
+          for(const candidate of body.candidates){
+            if(!candidate.placeId || !candidate.title) throw new Error('invalid-live-candidate');
+          }
+          console.log(`live_candidates=${body.candidates.length} queries=${body.queriesTried.length} sample=${body.candidates.slice(0,3).map(x=>x.title).join(' | ')}`);
+          NODE
+      - name: Result
+        run: echo 'J2A-1 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
