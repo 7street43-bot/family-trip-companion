@@ -1,0 +1,218 @@
+name: J2B Route Matrix
+
+on:
+  push:
+    branches: [j2b-route-matrix-v1, preview]
+    paths:
+      - 'public/itinerary-v2*'
+      - 'public/itinerary-origin*'
+      - 'public/itinerary-route*'
+      - 'netlify/functions/itinerary-origin-search.mjs'
+      - 'netlify/functions/itinerary-route-matrix.mjs'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'public/version.json'
+      - 'scripts/prepare-site.mjs'
+      - 'tests/j2a-*.mjs'
+      - 'tests/j2b-*.mjs'
+      - '.github/workflows/j2a-itinerary-v2.yml'
+      - '.github/workflows/j2b-origin.yml'
+      - '.github/workflows/j2b-route-matrix.yml'
+  pull_request:
+    branches: [preview]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'public/itinerary-v2*'
+      - 'public/itinerary-origin*'
+      - 'public/itinerary-route*'
+      - 'netlify/functions/itinerary-route-matrix.mjs'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'public/version.json'
+      - 'tests/j2a-*.mjs'
+      - 'tests/j2b-*.mjs'
+      - '.github/workflows/j2b-route-matrix.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j2b-route-${{ github.ref }}-${{ github.event.pull_request.number || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and route contracts
+        run: |
+          set -euo pipefail
+          node --check public/itinerary-v2-core.mjs
+          node --check public/itinerary-v2.mjs
+          node --check public/itinerary-origin.mjs
+          node --check public/itinerary-route.mjs
+          node --check netlify/functions/itinerary-origin-search.mjs
+          node --check netlify/functions/itinerary-route-matrix.mjs
+          node --check public/sw.js
+          node --check public/app.js
+          node --test tests/j2b-route-matrix.test.mjs
+          node --test tests/j2b-origin.test.mjs
+          node --test tests/j2a-itinerary-v2.test.mjs
+          node --test tests/j2a-candidate-pool.test.mjs
+      - name: J2B-2 isolation invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('public/index.html','utf8');
+          const sw=fs.readFileSync('public/sw.js','utf8');
+          const core=fs.readFileSync('public/itinerary-v2-core.mjs','utf8');
+          const route=fs.readFileSync('public/itinerary-route.mjs','utf8');
+          const provider=fs.readFileSync('netlify/functions/itinerary-route-matrix.mjs','utf8');
+          const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
+          for(const needle of ['itinerary-route.css','itinerary-route.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
+          for(const needle of ['itinerary-route.css','itinerary-route.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
+          if(!core.includes("const MODEL_VERSION = 2")) throw new Error('J2B-2 changed itinerary modelVersion');
+          if(!route.includes("provider: 'google-routes'")) throw new Error('routePlan persistence missing');
+          if(!route.includes("button.matches('[data-j2b2-calc]')")) throw new Error('explicit route action missing');
+          if(!provider.includes("path: '/api/itinerary-route-matrix'")) throw new Error('route endpoint path missing');
+          if(!provider.includes('originIndex,destinationIndex,status,condition,distanceMeters,duration')) throw new Error('required route field mask missing');
+          if(!provider.includes("routingPreference: 'TRAFFIC_UNAWARE'")) throw new Error('deterministic planning preference missing');
+          if(v.channel!=='J2B' || v.version!=='4.5.0-phase1.9-j2b.2') throw new Error(`wrong J2B-2 runtime:${v.version}/${v.channel}`);
+          NODE
+      - name: Existing frontend regression contracts
+        run: |
+          set -euo pipefail
+          node --test tests/j1k-journal-shell.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-runtime.test.mjs
+      - name: Result
+        run: echo 'J2B-2 ROUTE CONTRACT + J2B-1/J2A COMPATIBILITY = PASS'
+
+  webkit-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start local publish server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/j2b2-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/j2b2-http.log
+          exit 1
+      - name: J2B-2 mobile and desktop route gate
+        env:
+          J2B2_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2b-route-webkit-e2e.mjs
+      - name: J2B-1 origin regression
+        env:
+          J2B_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2b-origin-webkit-e2e.mjs
+      - name: J2A candidate regression
+        env:
+          J2A_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2a-webkit-e2e.mjs
+      - name: Result
+        run: echo 'J2B-2 WEBKIT ROUTE + J2B-1/J2A REGRESSION = PASS'
+
+  live-route-smoke:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/preview'
+    needs: [contract, webkit-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve and wait for runtime
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="https://deploy-preview-${PR_NUMBER}--comfy-heliotrope-475c71.netlify.app"
+          else
+            base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          fi
+          echo "$base" >/tmp/j2b2-base
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          for attempt in $(seq 1 48); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+              "$base/version.json?j2b2_live=${GITHUB_SHA}" -o /tmp/j2b2-version.json \
+              && EXPECTED="$expected" node - <<'NODE'
+          const fs=require('fs');
+          const live=JSON.parse(fs.readFileSync('/tmp/j2b2-version.json','utf8')).version;
+          if(live!==process.env.EXPECTED) process.exit(1);
+          NODE
+            then
+              echo "Route runtime ready: $base $expected"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'J2B-2 runtime did not become ready in time.'
+          exit 1
+      - name: Resolve live Google Places waypoints
+        run: |
+          set -euo pipefail
+          base=$(cat /tmp/j2b2-base)
+          search() {
+            local query="$1"
+            local out="$2"
+            local code
+            code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 40 \
+              --retry 1 --retry-all-errors --retry-delay 2 \
+              -X POST "$base/api/itinerary-origin-search" \
+              -H 'content-type: application/json' \
+              --data "{\"query\":\"${query}\"}" \
+              --output "$out" --write-out '%{http_code}')
+            test "$code" = '200' || { echo "origin API HTTP $code"; cat "$out"; exit 1; }
+          }
+          search '新竹市政府' /tmp/j2b2-home.json
+          search '新竹火車站' /tmp/j2b2-a.json
+          search '新竹市立動物園' /tmp/j2b2-b.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const read=p=>JSON.parse(fs.readFileSync(p,'utf8'))?.candidates?.[0];
+          const home=read('/tmp/j2b2-home.json'), a=read('/tmp/j2b2-a.json'), b=read('/tmp/j2b2-b.json');
+          for(const [name,c] of [['home',home],['a',a],['b',b]]) {
+            if(!c?.placeId || !c?.address) throw new Error(`missing-${name}-waypoint`);
+          }
+          fs.writeFileSync('/tmp/j2b2-route-request.json',JSON.stringify({
+            origin:{label:'家',placeId:home.placeId,address:home.address,latitude:home.latitude,longitude:home.longitude},
+            destination:{label:'家',placeId:home.placeId,address:home.address,latitude:home.latitude,longitude:home.longitude},
+            stops:[
+              {key:'live:a',title:a.displayName,placeId:a.placeId,address:a.address,latitude:a.latitude,longitude:a.longitude},
+              {key:'live:b',title:b.displayName,placeId:b.placeId,address:b.address,latitude:b.latitude,longitude:b.longitude}
+            ]
+          }));
+          NODE
+      - name: Google Routes live matrix smoke
+        run: |
+          set -euo pipefail
+          base=$(cat /tmp/j2b2-base)
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 50 \
+            --retry 1 --retry-all-errors --retry-delay 2 \
+            -X POST "$base/api/itinerary-route-matrix" \
+            -H 'content-type: application/json' \
+            --data-binary @/tmp/j2b2-route-request.json \
+            --output /tmp/j2b2-route.json --write-out '%{http_code}')
+          test "$code" = '200' || { echo "route API HTTP $code"; cat /tmp/j2b2-route.json; exit 1; }
+          node - <<'NODE'
+          const fs=require('fs');
+          const body=JSON.parse(fs.readFileSync('/tmp/j2b2-route.json','utf8'));
+          if(body?.provider!=='google-routes') throw new Error('route-provider-mismatch');
+          if(body?.routingPreference!=='TRAFFIC_UNAWARE') throw new Error('route-preference-mismatch');
+          if(!Array.isArray(body?.orderedStopKeys) || body.orderedStopKeys.length!==2) throw new Error('route-order-missing');
+          if(!Number.isFinite(Number(body?.current?.totalDurationSeconds)) || body.current.totalDurationSeconds<=0) throw new Error('current-duration-invalid');
+          if(!Number.isFinite(Number(body?.suggested?.totalDurationSeconds)) || body.suggested.totalDurationSeconds<=0) throw new Error('suggested-duration-invalid');
+          if(!Array.isArray(body?.suggested?.legs) || body.suggested.legs.length!==3) throw new Error('suggested-legs-invalid');
+          console.log(`route_current_s=${body.current.totalDurationSeconds} route_suggested_s=${body.suggested.totalDurationSeconds} savings_s=${body.savingsSeconds}`);
+          NODE
+      - name: Result
+        run: echo 'J2B-2 GOOGLE ROUTES LIVE MATRIX GATE = PASS'

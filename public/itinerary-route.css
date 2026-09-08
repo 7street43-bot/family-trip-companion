@@ -1,0 +1,28 @@
+.j2b2-route-card{
+  margin:14px 0;
+  padding:16px;
+  border:1px solid rgba(35,65,58,.12);
+  border-radius:18px;
+  background:#fff;
+  box-shadow:0 8px 24px rgba(38,54,50,.06)
+}
+.j2b2-route-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.j2b2-route-head strong{display:block;font-size:17px;color:#243b36}
+.j2b2-route-head small{display:block;margin-top:3px;color:#6e7d79;font-size:12px;line-height:1.45}
+.j2b2-route-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.j2b2-route-metrics>div{padding:11px 12px;border-radius:14px;background:#f7f8f6}
+.j2b2-route-metrics span,.j2b2-route-metrics small{display:block;color:#75817e;font-size:11px}
+.j2b2-route-metrics strong{display:block;margin:3px 0;color:#263c37;font-size:16px}
+.j2b2-route-status{margin:10px 0;padding:10px 12px;border-radius:12px;background:#fff8e5;color:#725b20;font-size:13px;line-height:1.5}
+.j2b2-route-status.success{background:#eef8f2;color:#315f48}
+.j2b2-route-error{margin:10px 0;padding:10px 12px;border-radius:12px;background:#fff0ef;color:#8d3d36;font-size:13px;line-height:1.5}
+.j2b2-route-actions{display:flex;gap:8px;margin-top:10px}
+.j2b2-route-actions .it2-btn{flex:1}
+.j2b2-route-helper{margin-top:10px;color:#72807c;font-size:12px;line-height:1.5}
+.j2b2-google{margin-top:8px;color:#8a9491;font-size:10px;text-align:right}
+.j2b2-leg{display:block!important;margin-top:4px!important;color:#4f6d64!important;font-weight:600}
+@media(max-width:540px){
+  .j2b2-route-card{padding:14px}
+  .j2b2-route-metrics{grid-template-columns:1fr}
+  .j2b2-route-actions{flex-direction:column}
+}
