@@ -1,0 +1,49 @@
+name: J2A Route Intelligence
+
+on:
+  push:
+    branches: [j2a-route-intelligence]
+    paths:
+      - 'public/itinerary-route-core.mjs'
+      - 'netlify/functions/itinerary-route-matrix.mjs'
+      - 'tests/j2a-route-intelligence.test.mjs'
+      - '.github/workflows/j2a-route-intelligence.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j2a-route-intelligence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          node --check public/itinerary-route-core.mjs
+          node --check netlify/functions/itinerary-route-matrix.mjs
+      - name: Route matrix and exact optimizer contract
+        run: node --test tests/j2a-route-intelligence.test.mjs
+      - name: Provider safety invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const fn=fs.readFileSync('netlify/functions/itinerary-route-matrix.mjs','utf8');
+          const core=fs.readFileSync('public/itinerary-route-core.mjs','utf8');
+          for(const needle of ["path:'/api/itinerary-route-matrix'", "routingPreference:'TRAFFIC_UNAWARE'", "travelMode:'DRIVE'", "windowLimit:10"]){
+            if(!fn.includes(needle)) throw new Error(`missing provider invariant: ${needle}`);
+          }
+          if(fn.includes('process.env')) throw new Error('new Netlify function must use Netlify.env, not process.env');
+          if(!core.includes('MAX_ROUTE_STOPS = 8')) throw new Error('8-stop cost bound missing');
+          if(!core.includes("strategy:'exact-duration-dp'")) throw new Error('exact optimizer marker missing');
+          NODE
+      - name: Existing J2A regression
+        run: |
+          set -euo pipefail
+          node --test tests/j2a-itinerary-v2.test.mjs
+          node --test tests/j2a-candidate-pool.test.mjs
+      - name: Result
+        run: echo 'J2A-2A ROUTE CORE + PROVIDER CONTRACT = PASS'
