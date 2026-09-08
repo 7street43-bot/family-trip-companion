@@ -1,6 +1,7 @@
 import {
   createTrip,
   withCandidates,
+  withOrigin,
   moveStop,
   removeStop,
   splitTrips,
@@ -18,6 +19,14 @@ import {
   selectedCandidates,
   queryDisplay
 } from './itinerary-candidates-core.mjs';
+import {
+  buildRouteLocations,
+  optimizeRoute,
+  applyOptimizedRoute,
+  formatRouteDuration,
+  formatRouteDistance,
+  MAX_ROUTE_STOPS
+} from './itinerary-route-core.mjs';
 
 const root = document.getElementById('app');
 const nav = document.getElementById('bottomNav');
@@ -32,15 +41,10 @@ const ui = {
   query: '',
   source: 'smart',
   smart: {
-    request: '',
-    location: '',
-    anchor: '',
-    themes: '',
-    loading: false,
-    error: '',
-    planner: null,
-    queriesTried: []
+    request: '', location: '', anchor: '', themes: '',
+    loading: false, error: '', planner: null, queriesTried: []
   },
+  route: { loading:false, error:'' },
   busy: false,
   mounted: false
 };
@@ -75,10 +79,8 @@ function resetCandidateState() {
   ui.selectedKeys = [];
   ui.query = '';
   ui.source = 'smart';
-  ui.smart = {
-    request: '', location: '', anchor: '', themes: '',
-    loading: false, error: '', planner: null, queriesTried: []
-  };
+  ui.smart = { request:'', location:'', anchor:'', themes:'', loading:false, error:'', planner:null, queriesTried:[] };
+  ui.route = { loading:false, error:'' };
 }
 
 async function loadData() {
@@ -106,18 +108,19 @@ function pageHead(title, subtitle, action = '') {
 }
 
 function tripCard(trip) {
+  const route = trip.routePlan?.totalDurationSeconds ? `・車程 ${formatRouteDuration(trip.routePlan.totalDurationSeconds)}` : '';
   return `<button class="it2-trip-card" data-it2-open="${esc(trip.id)}">
     <div class="it2-trip-card-main"><strong>${esc(trip.title)}</strong><span>${esc(formatDateLabel(trip.date))}</span></div>
-    <div class="it2-trip-card-meta"><span>${trip.stops?.length || 0} 個地點</span><span>›</span></div>
+    <div class="it2-trip-card-meta"><span>${trip.stops?.length || 0} 個地點${route}</span><span>›</span></div>
   </button>`;
 }
 
 function renderList() {
   const { upcoming, past } = splitTrips(ui.trips);
   return `<section class="it2-page" data-it2-screen="list">
-    ${pageHead('我的行程', '不用先整理收藏。說你想去哪，先找候選，再確認成行程。', '<button class="it2-btn it2-btn-primary" data-it2-new>＋ 建立新行程</button>')}
+    ${pageHead('我的行程', '說你想去哪，先找候選，再確認成行程；確認後還能幫你順路排。', '<button class="it2-btn it2-btn-primary" data-it2-new>＋ 建立新行程</button>')}
     ${upcoming.length ? `<section class="it2-section"><div class="it2-section-title"><h2>即將出發</h2><span>${upcoming.length} 趟</span></div><div class="it2-trip-list">${upcoming.map(tripCard).join('')}</div></section>` : `
-      <div class="it2-empty"><div class="it2-empty-icon">🗓</div><h2>還沒有下一趟行程</h2><p>選日期後，可以直接說「想怎麼玩」，也可以從收藏挑，不需要先研究操作方式。</p><button class="it2-btn it2-btn-primary it2-btn-large" data-it2-new>建立第一個行程</button></div>`}
+      <div class="it2-empty"><div class="it2-empty-icon">🗓</div><h2>還沒有下一趟行程</h2><p>選日期後，可以直接說「想怎麼玩」，也可以從收藏挑。</p><button class="it2-btn it2-btn-primary it2-btn-large" data-it2-new>建立第一個行程</button></div>`}
     ${past.length ? `<section class="it2-section"><div class="it2-section-title"><h2>過去行程</h2><span>${past.length} 趟</span></div><div class="it2-trip-list">${past.map(tripCard).join('')}</div></section>` : ''}
   </section>`;
 }
@@ -129,11 +132,12 @@ function renderCreate() {
     <button class="it2-back" data-it2-back-list>‹ 我的行程</button>
     <div class="it2-step">1 / 3</div>
     <h1>哪一天去哪？</h1>
-    <p class="it2-lead">先決定日期就好，名稱可以讓 App 自動取。</p>
+    <p class="it2-lead">先決定日期。若填出發／回家地址，之後會連去程與回程一起順路計算。</p>
     <div class="it2-form-card">
       <label><span>日期</span><input id="it2Date" type="date" value="${esc(draft.date)}" /></label>
       <label><span>行程名稱 <small>可不填</small></span><input id="it2Title" type="text" value="${esc(draft.title || '')}" placeholder="例如：宜蘭一日遊" /></label>
       <label><span>預計出發</span><input id="it2Departure" type="time" value="${esc(draft.departureTime || '09:00')}" /></label>
+      <label><span>出發／回家地址 <small>可不填</small></span><input id="it2OriginAddress" type="text" value="${esc(draft.origin?.address || '')}" placeholder="例如：新竹市東區光復路二段…" /><small>留白時只最佳化景點彼此的順序，不儲存任何預設私人地址。</small></label>
     </div>
     <button class="it2-btn it2-btn-primary it2-btn-block" data-it2-to-pick>下一步：找地點</button>
   </section>`;
@@ -217,11 +221,17 @@ function renderPick() {
   </section>`;
 }
 
+function routeLegTo(key) {
+  return (ui.draft?.routePlan?.legs || []).find(leg => leg.toKey === key) || null;
+}
+
 function stopRow(stop, index, total) {
   const source = SOURCE_LABEL[stop.source] || TYPE_LABEL[stop.entityType] || '地點';
-  return `<div class="it2-stop-row">
+  const leg = routeLegTo(stop.candidateKey);
+  const drive = leg ? `<span class="it2-drive-chip">🚗 ${esc(formatRouteDuration(leg.durationSeconds))}</span>` : '';
+  return `<div class="it2-stop-row" data-it2-stop-key="${esc(stop.candidateKey || stop.id)}">
     <div class="it2-stop-index">${index + 1}</div>
-    <div class="it2-stop-copy"><strong>${esc(stop.title)}</strong><small>${esc(source)}${stop.address ? `・${esc(stop.address)}` : ''}</small></div>
+    <div class="it2-stop-copy"><div class="it2-stop-title-line"><strong>${esc(stop.title)}</strong>${drive}</div><small>${esc(source)}${stop.address ? `・${esc(stop.address)}` : ''}</small></div>
     <div class="it2-stop-actions">
       <button data-it2-move="up" data-index="${index}" aria-label="往上" ${index === 0 ? 'disabled' : ''}>↑</button>
       <button data-it2-move="down" data-index="${index}" aria-label="往下" ${index === total - 1 ? 'disabled' : ''}>↓</button>
@@ -230,18 +240,45 @@ function stopRow(stop, index, total) {
   </div>`;
 }
 
+function routeReasonMessage(routeCheck) {
+  if (routeCheck.reason === 'need_two_stops') return '至少需要 2 個地點才能順路排序。';
+  if (routeCheck.reason === 'too_many_stops') return `目前一次最多 ${MAX_ROUTE_STOPS} 站，避免 Route Matrix 成本失控。`;
+  if (routeCheck.reason === 'unroutable_stops') return `有 ${routeCheck.blockers.length} 個地點缺少 Google 地點、精確座標或完整地址；先回候選池選正式地點。`;
+  return '目前無法建立路由矩陣。';
+}
+
+function renderRouteTools() {
+  const trip = ui.draft;
+  const check = buildRouteLocations(trip.stops || [], trip.origin || null);
+  const plan = trip.routePlan;
+  const hasOrigin = !!check.originPoint;
+  const summary = plan ? `<div class="it2-route-summary"><strong>順路排序完成</strong><span>總車程 ${esc(formatRouteDuration(plan.totalDurationSeconds))}・${esc(formatRouteDistance(plan.totalDistanceMeters))}${plan.roundTrip ? '・含回家' : '・不含出發／回家'}</span></div>` : '';
+  const note = check.ok
+    ? (hasOrigin ? '會計算「出發地 → 各站 → 回家」的完整閉環。' : '未填出發地址，所以只比較景點彼此的車程順序。')
+    : routeReasonMessage(check);
+  return `<section class="it2-route-tools">
+    <div><strong>順路排</strong><p>${esc(note)}</p></div>
+    <button class="it2-btn it2-btn-route" data-it2-optimize-route ${!check.ok || ui.route.loading ? 'disabled' : ''}>${ui.route.loading ? '正在算車程…' : '✨ 幫我順路排'}</button>
+    ${ui.route.error ? `<div class="it2-route-error">${esc(ui.route.error)}</div>` : ''}
+    ${summary}
+  </section>`;
+}
+
 function renderArrange() {
   const trip = ui.draft;
+  const originAddress = trip.origin?.address || '';
+  const returnLeg = (trip.routePlan?.legs || []).find(leg => leg.toKey === 'origin:home');
   return `<section class="it2-page it2-flow" data-it2-screen="arrange">
     <button class="it2-back" data-it2-back-pick>‹ 候選池</button>
     <div class="it2-step">3 / 3</div>
-    <div class="it2-builder-head"><div><h1>${esc(trip.title)}</h1><p>${esc(formatDateLabel(trip.date))}</p></div><button class="it2-btn" data-it2-edit-basic>修改日期</button></div>
+    <div class="it2-builder-head"><div><h1>${esc(trip.title)}</h1><p>${esc(formatDateLabel(trip.date))}</p></div><button class="it2-btn" data-it2-edit-basic>修改日期／出發地</button></div>
+    ${renderRouteTools()}
     <div class="it2-timeline">
-      <div class="it2-fixed-stop"><span class="it2-stop-index">⌂</span><div><strong>${esc(trip.departureTime || '09:00')} 出發</strong><small>從家裡開始</small></div></div>
+      <div class="it2-fixed-stop"><span class="it2-stop-index">⌂</span><div><strong>${esc(trip.departureTime || '09:00')} 出發</strong><small>${originAddress ? esc(originAddress) : '未設定出發地址'}</small></div></div>
       <div class="it2-stop-list">${trip.stops.length ? trip.stops.map((s, i) => stopRow(s, i, trip.stops.length)).join('') : '<div class="it2-mini-empty">候選池還沒有確認任何地點。</div>'}</div>
-      <div class="it2-fixed-stop"><span class="it2-stop-index">⌂</span><div><strong>回家</strong><small>最後一站</small></div></div>
+      <div class="it2-fixed-stop"><span class="it2-stop-index">⌂</span><div><strong>${originAddress ? '回家' : '行程結束'}</strong><small>${returnLeg ? `🚗 ${esc(formatRouteDuration(returnLeg.durationSeconds))}` : (originAddress ? '回到出發地' : '未計回程')}</small></div></div>
     </div>
-    <div class="it2-builder-note">這裡才是正式行程草稿。候選池中的其他景點不會被寫入行程。</div>
+    <div class="it2-builder-note">候選池不會自動寫入行程；順路排也只改目前草稿順序，最後按「完成行程」才正式儲存。</div>
     <button class="it2-btn it2-btn-primary it2-btn-block" data-it2-save ${trip.stops.length ? '' : 'disabled'}>${ui.trips.some(t => t.id === trip.id) ? '儲存修改' : '完成行程'}</button>
   </section>`;
 }
@@ -288,7 +325,12 @@ function syncBasicFields() {
   const date = document.getElementById('it2Date')?.value || ui.draft.date;
   const title = document.getElementById('it2Title')?.value || '';
   const departureTime = document.getElementById('it2Departure')?.value || '09:00';
-  ui.draft = createTrip({ ...ui.draft, date, title, departureTime, createdAt: ui.draft.createdAt });
+  const originAddress = document.getElementById('it2OriginAddress')?.value?.trim() || '';
+  const originChanged = originAddress !== (ui.draft.origin?.address || '');
+  let next = createTrip({ ...ui.draft, date, title, departureTime, createdAt:ui.draft.createdAt });
+  if (originChanged) next = withOrigin(next, { ...next.origin, address:originAddress, label:'家' });
+  ui.draft = next;
+  ui.route.error = '';
 }
 
 function syncSmartFields() {
@@ -313,9 +355,7 @@ async function searchSmartCandidates() {
   render();
   try {
     const response = await fetch('/api/itinerary-candidates', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...plannerInput, limit: 15 })
+      method:'POST', headers:{ 'content-type':'application/json' }, body:JSON.stringify({ ...plannerInput, limit:15 })
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.message || body.error || `候選搜尋失敗 (${response.status})`);
@@ -332,18 +372,52 @@ async function searchSmartCandidates() {
   }
 }
 
+async function optimizeCurrentRoute() {
+  if (!ui.draft || ui.route.loading) return;
+  const check = buildRouteLocations(ui.draft.stops || [], ui.draft.origin || null);
+  if (!check.ok) {
+    ui.route.error = routeReasonMessage(check);
+    render();
+    return;
+  }
+  ui.route.loading = true;
+  ui.route.error = '';
+  render();
+  try {
+    const response = await fetch('/api/itinerary-route-matrix', {
+      method:'POST', headers:{ 'content-type':'application/json' }, body:JSON.stringify({ locations:check.locations })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || body.error || `路由服務失敗 (${response.status})`);
+    const plan = optimizeRoute(check.stopPoints, body.elements || [], { originPoint:check.originPoint, roundTrip:!!check.originPoint });
+    if (!plan.ok) throw new Error(plan.reason === 'route_incomplete' ? '部分地點之間找不到可行車程' : '無法完成順路排序');
+    const applied = applyOptimizedRoute(ui.draft, plan);
+    ui.draft = createTrip({
+      ...applied,
+      routePlan:{ ...applied.routePlan, provider:body.provider || null },
+      createdAt:ui.draft.createdAt
+    });
+  } catch (error) {
+    ui.route.error = `目前無法順路排序：${error.message || '請稍後再試'}`;
+  } finally {
+    ui.route.loading = false;
+    render();
+  }
+}
+
 function materializeSelected() {
   if (!ui.draft) return;
   const plannerInput = normalizePlannerInput(ui.smart);
   const base = createTrip({ ...ui.draft, plannerInput, createdAt: ui.draft.createdAt });
   ui.draft = withCandidates(base, ui.candidatePool, ui.selectedKeys);
+  ui.route.error = '';
 }
 
 async function saveDraft() {
   if (!ui.draft?.stops?.length || ui.busy) return;
   ui.busy = true;
   try {
-    const saved = createTrip({ ...ui.draft, status: 'planned', createdAt: ui.draft.createdAt });
+    const saved = createTrip({ ...ui.draft, status:'planned', createdAt:ui.draft.createdAt });
     await TwinDB.put('itineraries', saved);
     await openList();
   } finally {
@@ -355,7 +429,7 @@ function onRootClick(event) {
   const button = event.target.closest('button');
   if (!button || !root?.contains(button)) return;
   if (button.matches('[data-it2-new]')) {
-    ui.draft = createTrip({ date: localToday(), title: '' });
+    ui.draft = createTrip({ date:localToday(), title:'' });
     resetCandidateState();
     ui.screen = 'create';
     render();
@@ -367,14 +441,12 @@ function onRootClick(event) {
   if (button.matches('[data-it2-source]')) { ui.source = button.dataset.it2Source; render(); return; }
   if (button.matches('[data-it2-candidate]')) {
     const key = button.dataset.it2Candidate;
-    const willSelect = !selectedSet().has(key);
-    ui.selectedKeys = toggleSelectionOrder(ui.selectedKeys, key, willSelect);
+    ui.selectedKeys = toggleSelectionOrder(ui.selectedKeys, key, !selectedSet().has(key));
     render();
     return;
   }
   if (button.matches('[data-it2-add-custom]')) {
-    const input = document.getElementById('it2Custom');
-    const candidate = candidateFromCustom(input?.value || '');
+    const candidate = candidateFromCustom(document.getElementById('it2Custom')?.value || '');
     if (candidate) {
       ui.candidatePool = mergeCandidatePool(ui.candidatePool, [candidate]);
       ui.selectedKeys = toggleSelectionOrder(ui.selectedKeys, candidate.key, true);
@@ -383,12 +455,7 @@ function onRootClick(event) {
     return;
   }
   if (button.matches('[data-it2-smart-search]')) return void searchSmartCandidates();
-  if (button.matches('[data-it2-to-arrange]')) {
-    materializeSelected();
-    ui.screen = 'arrange';
-    render();
-    return;
-  }
+  if (button.matches('[data-it2-to-arrange]')) { materializeSelected(); ui.screen = 'arrange'; render(); return; }
   if (button.matches('[data-it2-back-pick]')) {
     ui.selectedKeys = (ui.draft?.stops || []).map(s => s.candidateKey).filter(Boolean);
     seedCandidates((ui.draft?.stops || []).map(candidateFromStop).filter(Boolean));
@@ -397,10 +464,11 @@ function onRootClick(event) {
     return;
   }
   if (button.matches('[data-it2-edit-basic]')) { ui.screen = 'create'; render(); return; }
+  if (button.matches('[data-it2-optimize-route]')) return void optimizeCurrentRoute();
   if (button.matches('[data-it2-move]')) {
     const index = Number(button.dataset.index);
-    const to = button.dataset.it2Move === 'up' ? index - 1 : index + 1;
-    ui.draft = moveStop(ui.draft, index, to);
+    ui.draft = moveStop(ui.draft, index, button.dataset.it2Move === 'up' ? index - 1 : index + 1);
+    ui.route.error = '';
     render();
     return;
   }
@@ -409,6 +477,7 @@ function onRootClick(event) {
     const removed = ui.draft.stops[index];
     if (removed?.candidateKey) ui.selectedKeys = toggleSelectionOrder(ui.selectedKeys, removed.candidateKey, false);
     ui.draft = removeStop(ui.draft, index);
+    ui.route.error = '';
     render();
     return;
   }
@@ -448,5 +517,5 @@ root?.addEventListener('input', onRootInput, true);
 window.TwinItineraryV2 = Object.freeze({
   open: openList,
   openTrip,
-  version: 'J2A-1'
+  version: 'J2A-2'
 });
