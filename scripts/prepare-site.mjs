@@ -68,7 +68,7 @@ app = app.replace(cloudStartup, `      if(window.TwinCloudSync) scheduleIdleTask
 
 const legacySwBlock = `      if ('serviceWorker' in navigator) {\n        let reloading = false;\n        navigator.serviceWorker.addEventListener('controllerchange', () => {\n          if (reloading) return;\n          reloading = true;\n          location.reload();\n        });\n        navigator.serviceWorker.register('./sw.js?v=4.5.0-phase1.2', { updateViaCache:'none' })\n          .then(reg => reg.update().catch(()=>{}))\n          .catch(()=>{});\n      }`;
 if (!app.includes(legacySwBlock)) throw new Error('app.js legacy service-worker block missing');
-app = app.replace(legacySwBlock, `      scheduleIdleTask(()=>window.TwinUpdateManager?.register?.(),{delay:1200,timeout:4000});`);
+app = app.replace(legacySwBlock, `      scheduleIdleTask(()=>window.TwinUpdateManager?.register ? window.TwinUpdateManager.register() : undefined,{delay:1200,timeout:4000});`);
 await writeFile(appPath, app, 'utf8');
 
 console.log(`Prepared site runtime ${runtime.version} from public/version.json.`);
