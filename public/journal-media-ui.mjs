@@ -1,6 +1,6 @@
 import journalBinding from './journal-browser.mjs';
 
-const VERSION='4.5.0-phase1.6-j1g.1';
+const VERSION='4.5.0-phase1.6-j1g.8';
 const state={entryId:null,media:[],urls:new Map(),loading:false,message:'',messageType:'',showHidden:false,seq:0};
 const ACCEPTED=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
 const MAX_BYTES=25*1024*1024;
@@ -16,7 +16,7 @@ function editor(){return document.getElementById('journalEditForm');}
 function section(){return document.getElementById('journalMediaSection');}
 function selectedEntryId(){return String(editor()?.dataset?.id||'');}
 function statusMessage(text,type=''){state.message=String(text||'');state.messageType=type;renderSection();}
-function syncHeaderVersion(){const small=document.querySelector('#journalOverlay .journal-head-copy small');if(!small)return;const prefix=String(small.textContent||'').split('｜')[0]||'手機紀錄與回顧';small.textContent=`${prefix}｜${VERSION}`;}
+function syncHeaderVersion(){const small=document.querySelector('#journalOverlay .journal-head-copy small');if(!small)return;const prefix=String(small.textContent||'').split('｜')[0]||'手機紀錄與回顧';const next=`${prefix}｜${VERSION}`;if(small.textContent!==next)small.textContent=next;}
 function captionInput(mediaId){return [...(section()?.querySelectorAll('[data-media-caption-input]')||[])].find(el=>el.dataset.mediaCaptionInput===mediaId)||null;}
 
 async function status(){try{await journalBinding.init();return await journalBinding.getStatus();}catch(err){return {configured:false,authenticated:false,originMatch:false,error:err?.message||String(err)};}}
