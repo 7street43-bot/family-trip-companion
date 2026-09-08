@@ -1,0 +1,1 @@
+J2A itinerary V2 rebuild work happens on an isolated branch. This checkpoint exists only to reserve the rebuild track and will be removed before merge.
