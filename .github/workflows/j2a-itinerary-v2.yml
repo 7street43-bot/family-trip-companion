@@ -2,7 +2,7 @@ name: J2A Itinerary V2
 
 on:
   push:
-    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, j2a-home-bootstrap-fix, preview]
+    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, j2a-home-bootstrap-fix, j2a-fast-start, preview]
     paths:
       - 'public/itinerary-v2*'
       - 'public/itinerary-candidates-core.mjs'
@@ -61,11 +61,16 @@ jobs:
           if(!candidates.includes("const CANDIDATE_MODEL = 'itinerary-candidate-v1'")) throw new Error('candidate model marker missing');
           if(!provider.includes("path: '/api/itinerary-candidates'")) throw new Error('candidate endpoint path missing');
           if(!provider.includes('aiAdapterReady: true')) throw new Error('planner adapter extension point missing');
-          const earlyPaint="if (!app.childElementCount && state.view === 'home') render();";
+          const earlyPaint="if (!app.childElementCount && state.view === 'home') {";
+          const frameYield='raf(() => raf(resolve));';
           const migration='await migrateGeographyIfNeeded();';
           if(!app.includes(earlyPaint)) throw new Error('early-home-paint missing from prepared runtime');
+          if(!app.includes(frameYield)) throw new Error('first-frame yield missing from prepared runtime');
           if(app.indexOf(earlyPaint) > app.indexOf(migration)) throw new Error('home paint occurs after migration gate');
-          if(v.channel!=='J2A' || v.version!=='4.5.0-phase1.8-j2a.2') throw new Error(`wrong J2A-2 runtime:${v.version}/${v.channel}`);
+          if(app.indexOf(frameYield) > app.indexOf(migration)) throw new Error('frame yield occurs after migration gate');
+          if(!app.includes('scheduleInboxAutomation(1200)')) throw new Error('startup inbox automation is not deferred');
+          if(!app.includes("requestIdleCallback(startUpdateManager,{timeout:1500})")) throw new Error('update-manager startup is not idle-deferred');
+          if(v.channel!=='J2A' || v.version!=='4.5.0-phase1.8-j2a.3') throw new Error(`wrong J2A-3 runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts
         run: |
@@ -74,7 +79,7 @@ jobs:
           node --test tests/journal-j1f-ui.test.mjs
           node --test tests/journal-j1g-runtime.test.mjs
       - name: Result
-        run: echo 'J2A-2 HOME BOOTSTRAP + CANDIDATE PROVIDER CONTRACT = PASS'
+        run: echo 'J2A-3 FIRST-FRAME FAST START + CANDIDATE PROVIDER CONTRACT = PASS'
 
   webkit-e2e:
     runs-on: ubuntu-latest
@@ -98,7 +103,7 @@ jobs:
           J2A_BASE_URL: http://127.0.0.1:4173
         run: node tests/j2a-webkit-e2e.mjs
       - name: Result
-        run: echo 'J2A-2 WEBKIT CANDIDATE POOL UX GATE = PASS'
+        run: echo 'J2A-3 WEBKIT CANDIDATE POOL UX GATE = PASS'
 
   live-preview-provider-smoke:
     if: github.ref == 'refs/heads/preview'
@@ -153,4 +158,4 @@ jobs:
           console.log(`live_candidates=${body.candidates.length} queries=${body.queriesTried.length} sample=${body.candidates.slice(0,3).map(x=>x.title).join(' | ')}`);
           NODE
       - name: Result
-        run: echo 'J2A-2 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
+        run: echo 'J2A-3 GOOGLE PLACES LIVE PROVIDER GATE = PASS'
