@@ -16,9 +16,11 @@ const mockCandidates = [
 
 async function run(viewport, label) {
   const browser = await webkit.launch();
-  const page = await browser.newPage({ viewport });
+  const context = await browser.newContext({ viewport, serviceWorkers:'block' });
+  const page = await context.newPage();
   const errors = [];
   const nonCritical404 = [];
+  let candidateRequests = 0;
   page.on('pageerror', err => errors.push(`pageerror:${String(err)}`));
   page.on('response', response => {
     const status = response.status();
@@ -29,6 +31,7 @@ async function run(viewport, label) {
     else nonCritical404.push(item);
   });
   await page.route('**/api/itinerary-candidates', async route => {
+    candidateRequests += 1;
     const request = route.request();
     const body = JSON.parse(request.postData() || '{}');
     assert.ok(body.request || body.location || body.anchor || body.themes?.length, `${label}: smart planner payload empty`);
@@ -70,6 +73,7 @@ async function run(viewport, label) {
   await page.fill('#it2SmartThemes', '動物、室內');
   await page.click('[data-it2-smart-search]');
   await page.waitForFunction(() => document.querySelectorAll('[data-it2-candidate^="place:"]').length >= 4);
+  assert.equal(candidateRequests, 1, `${label}: candidate endpoint request count mismatch`);
 
   const dbBeforeConfirm = await page.evaluate(async () => (await TwinDB.getAll('itineraries')).filter(x => x.model === 'itinerary-v2' && x.title === 'J2A 候選池測試').length);
   assert.equal(dbBeforeConfirm, 0, `${label}: candidate search must never write an itinerary`);
@@ -88,7 +92,6 @@ async function run(viewport, label) {
   await page.locator('.it2-stop-row').nth(1).locator('[data-it2-move="up"]').click();
   assert.deepEqual(await page.locator('.it2-stop-row strong').allTextContents(), ['張美阿嬤農場', '斑比山丘', '宜蘭傳藝園區'], `${label}: reorder failed`);
 
-  // Return to pool, add one candidate, reconfirm. Manual order must survive.
   await page.click('[data-it2-back-pick]');
   await page.waitForSelector('[data-it2-screen="pick"]');
   await page.click('[data-it2-candidate="place:mock4"]');
@@ -125,7 +128,8 @@ async function run(viewport, label) {
   assert.equal(dbCheck.plannerInput.location, '宜蘭', `${label}: planner input not retained with trip`);
 
   if (errors.length) throw new Error(`${label}: critical browser errors: ${errors.join(' | ')}`);
-  console.log(`${label}: non-critical HTTP failures observed=${[...new Set(nonCritical404)].join(',') || 'none'}`);
+  console.log(`${label}: candidate API mock requests=${candidateRequests}; non-critical HTTP failures observed=${[...new Set(nonCritical404)].join(',') || 'none'}`);
+  await context.close();
   await browser.close();
 }
 
