@@ -103,6 +103,7 @@ async function run(viewport, label) {
 
   await page.click('[data-j2c-apply]');
   await page.waitForFunction(() => window.TwinItineraryTimeline?.isApplied?.() === true);
+  await page.waitForFunction(() => document.querySelector('#j2cTimelineCard')?.innerText.includes('已套用到行程草稿'));
   assert.match(await page.locator('#j2cTimelineCard').innerText(), /已套用到行程草稿/, `${label}: explicit apply status missing`);
 
   await page.click('[data-it2-save]');
