@@ -59,7 +59,7 @@ jobs:
           if(!origin.includes("TwinDB.put('settings',{key:'defaultOrigin'")) throw new Error('default origin persistence missing');
           if(!origin.includes('/api/itinerary-origin-search')) throw new Error('origin provider wiring missing');
           if(!provider.includes("path: '/api/itinerary-origin-search'")) throw new Error('origin endpoint path missing');
-          const allowedRuntime=(v.channel==='J2B' && ['4.5.0-phase1.9-j2b.1','4.5.0-phase1.9-j2b.2'].includes(v.version)) || (v.channel==='J2C' && v.version==='4.5.0-phase1.10-j2c.1');
+          const allowedRuntime=(v.channel==='J2B' && ['4.5.0-phase1.9-j2b.1','4.5.0-phase1.9-j2b.2'].includes(v.version)) || (v.channel==='J2C' && ['4.5.0-phase1.10-j2c.1','4.5.0-phase1.10-j2c.1.1'].includes(v.version));
           if(!allowedRuntime) throw new Error(`wrong J2B-compatible runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts
