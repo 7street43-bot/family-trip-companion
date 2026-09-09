@@ -49,7 +49,7 @@ async function run(viewport, label) {
 
   const nav = await page.goto(baseURL, { waitUntil:'networkidle' });
   assert.ok(nav?.ok(), `${label}: navigation failed`);
-  await page.waitForFunction(() => !!window.TwinDB && !!window.TwinItineraryV2 && !!window.TwinItineraryRoute && !!window.TwinItineraryTimeline);
+  await page.waitForFunction(() => !!window.TwinDB && !!window.TwinItineraryV2 && !!window.TwinItineraryRoute && !!window.TwinItineraryTimeline && !!window.TwinItineraryTimelineInputSync);
 
   await page.evaluate(async () => {
     await TwinDB.put('itineraries', {
@@ -87,12 +87,20 @@ async function run(viewport, label) {
   assert.match(await page.locator('#j2cTimelineCard').innerText(), /12:45/, `${label}: default return ETA mismatch`);
   assert.equal(await page.evaluate(() => TwinItineraryTimeline.isApplied()), false, `${label}: timeline applied silently`);
 
-  const inputs = page.locator('[data-j2c-duration]');
-  await inputs.nth(0).fill('60');
-  await inputs.nth(0).blur();
-  await page.waitForFunction(() => document.querySelector('#j2cTimelineCard')?.innerText.includes('12:15') || document.querySelector('#j2cTimelineCard')?.innerText.includes('11:15'));
-  await inputs.nth(1).fill('30');
-  await inputs.nth(1).blur();
+  // Real-device regression: iPhone Safari may only expose the latest focused
+  // number value through `input` before the user taps Apply/Save. Deliberately
+  // dispatch input without blur/change and require the timeline state to follow.
+  await page.evaluate(() => {
+    const inputs = document.querySelectorAll('[data-j2c-duration]');
+    inputs[0].value = '60';
+    inputs[0].dispatchEvent(new Event('input', { bubbles:true }));
+  });
+  await page.waitForFunction(() => document.querySelector('#j2cTimelineCard')?.innerText.includes('12:15'));
+  await page.evaluate(() => {
+    const inputs = document.querySelectorAll('[data-j2c-duration]');
+    inputs[1].value = '30';
+    inputs[1].dispatchEvent(new Event('input', { bubbles:true }));
+  });
   await page.waitForFunction(() => document.querySelector('#j2cTimelineCard')?.innerText.includes('11:15'));
 
   const rowText = await page.locator('.j2c-stop-schedule').allTextContents();
@@ -129,11 +137,11 @@ async function run(viewport, label) {
   assert.match(await page.locator('#j2cTimelineCard').innerText(), /已套用到行程草稿/, `${label}: persisted schedule status missing`);
 
   if (errors.length) throw new Error(`${label}: browser errors: ${errors.join(' | ')}`);
-  console.log(`${label}: route -> editable dwell -> explicit timeline apply -> persist -> restore = PASS`);
+  console.log(`${label}: route -> input-only manual dwell -> explicit timeline apply -> persist -> restore = PASS`);
   await context.close();
   await browser.close();
 }
 
 await run({width:390,height:844}, 'mobile');
 await run({width:1280,height:900}, 'desktop');
-console.log('J2C-1 WEBKIT ROAD TIMELINE UX GATE = PASS');
+console.log('J2C-1.1 WEBKIT ROAD TIMELINE REAL-DEVICE INPUT GATE = PASS');
