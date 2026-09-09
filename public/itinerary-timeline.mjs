@@ -379,8 +379,7 @@ function patchItineraryPersistence() {
         if (preserved) return originalPut(store, preserved);
         return originalPut(store, {
           ...value,
-          scheduleSchemaVersion: null,
-          stops: (value.stops || []).map(stop => ({ ...stop, plannedTime: '' }))
+          scheduleSchemaVersion: null
         });
       }
 
@@ -422,7 +421,7 @@ document.addEventListener('click', event => {
     if (state.timeline && routePlan()) {
       state.armed = true;
       state.persistedSchedule = null;
-      queueDecorate();
+      void decorateArrange();
     }
     return;
   }
