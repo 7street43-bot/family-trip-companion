@@ -1,0 +1,166 @@
+name: J2A Itinerary V2
+
+on:
+  push:
+    branches: [j2a-itinerary-v2, j2a-live-provider-smoke, j2a-home-bootstrap-fix, j2a-fast-start, j2a-fast-start-gatefix, preview]
+    paths:
+      - 'public/itinerary-v2*'
+      - 'public/itinerary-candidates-core.mjs'
+      - 'netlify/functions/itinerary-candidates.mjs'
+      - 'public/index.html'
+      - 'public/sw.js'
+      - 'public/version.json'
+      - 'scripts/prepare-site.mjs'
+      - 'tests/j2a-*.mjs'
+      - '.github/workflows/j2a-itinerary-v2.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: j2a-itinerary-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and V2 candidate contracts
+        run: |
+          set -euo pipefail
+          node --check public/itinerary-v2-core.mjs
+          node --check public/itinerary-candidates-core.mjs
+          node --check public/itinerary-v2.mjs
+          node --check netlify/functions/itinerary-candidates.mjs
+          node --check public/sw.js
+          node --check public/app.js
+          node --test tests/j2a-itinerary-v2.test.mjs
+          node --test tests/j2a-candidate-pool.test.mjs
+      - name: Isolation and candidate-pool invariants
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('public/index.html','utf8');
+          const sw=fs.readFileSync('public/sw.js','utf8');
+          const app=fs.readFileSync('public/app.js','utf8');
+          const ui=fs.readFileSync('public/itinerary-v2.mjs','utf8');
+          const core=fs.readFileSync('public/itinerary-v2-core.mjs','utf8');
+          const candidates=fs.readFileSync('public/itinerary-candidates-core.mjs','utf8');
+          const provider=fs.readFileSync('netlify/functions/itinerary-candidates.mjs','utf8');
+          const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
+          for(const needle of ['itinerary-v2.css','itinerary-v2.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
+          for(const needle of ['itinerary-v2.css','itinerary-v2-core.mjs','itinerary-candidates-core.mjs','itinerary-v2.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
+          if(!core.includes("const MODEL = 'itinerary-v2'")) throw new Error('V2 model marker missing');
+          if(!core.includes('const MODEL_VERSION = 2')) throw new Error('V2 model version missing');
+          if(!ui.includes("filter(isV2Trip)")) throw new Error('V2 UI does not isolate legacy itineraries');
+          if(!ui.includes("[data-view=\"trips\"]")) throw new Error('V2 does not intercept trips navigation');
+          if(!ui.includes('data-it2-smart-search') || !ui.includes('/api/itinerary-candidates')) throw new Error('external candidate provider not wired');
+          if(!ui.includes('withCandidates(base, ui.candidatePool, ui.selectedKeys)')) throw new Error('candidate confirmation is not the stop materialization gate');
+          if(!candidates.includes("const CANDIDATE_MODEL = 'itinerary-candidate-v1'")) throw new Error('candidate model marker missing');
+          if(!provider.includes("path: '/api/itinerary-candidates'")) throw new Error('candidate endpoint path missing');
+          if(!provider.includes('aiAdapterReady: true')) throw new Error('planner adapter extension point missing');
+          for(const needle of [
+            'async function reloadData({runMigrations=true}={})',
+            'await reloadData({runMigrations:false})',
+            'function scheduleIdleTask(task',
+            'function scheduleInboxAutomationWhenSafe(delayMs=1200)',
+            "document.querySelector('[data-it2-screen]')",
+            "document.querySelector('#journalNavBtn.active')",
+            "scheduleIdleTask(()=>window.TwinUpdateManager?.register ? window.TwinUpdateManager.register() : undefined,{delay:1200,timeout:4000})"
+          ]) if(!app.includes(needle)) throw new Error(`J2A-3.1 startup marker missing: ${needle}`);
+          const fastRead=app.indexOf('await reloadData({runMigrations:false})');
+          const idleMaintenance=app.indexOf("scheduleIdleTask(async()=>{\n        await reloadData();");
+          if(fastRead<0 || idleMaintenance<0 || fastRead>idleMaintenance) throw new Error('startup migrations are not deferred after fast local read');
+          if(!app.includes('TwinUpdateManager.register')) throw new Error('update-manager ownership marker missing');
+          const allowedRuntime=(v.channel==='J2A' && v.version==='4.5.0-phase1.8-j2a.3.1') || (v.channel==='J2B' && ['4.5.0-phase1.9-j2b.1','4.5.0-phase1.9-j2b.2'].includes(v.version));
+          if(!allowedRuntime) throw new Error(`wrong J2A-compatible runtime:${v.version}/${v.channel}`);
+          NODE
+      - name: Existing frontend regression contracts
+        run: |
+          set -euo pipefail
+          node --test tests/j1k-journal-shell.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-runtime.test.mjs
+      - name: Result
+        run: echo 'J2A-3.1 INVARIANTS + SUCCESSOR RUNTIME CANDIDATE PROVIDER CONTRACT = PASS'
+
+  webkit-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare publish artifact
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start local publish server
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/j2a-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
+          cat /tmp/j2a-http.log
+          exit 1
+      - name: Mobile and desktop candidate-pool gate
+        env:
+          J2A_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2a-webkit-e2e.mjs
+      - name: Result
+        run: echo 'J2A WEBKIT CANDIDATE POOL UX GATE = PASS'
+
+  live-preview-provider-smoke:
+    if: github.ref == 'refs/heads/preview'
+    needs: [contract, webkit-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for fixed Preview runtime
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          expected=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('public/version.json','utf8')).version)")
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+              "$base/version.json?j2a_live=${GITHUB_SHA}" -o /tmp/j2a-version.json \
+              && EXPECTED="$expected" node - <<'NODE'
+          const fs=require('fs');
+          const live=JSON.parse(fs.readFileSync('/tmp/j2a-version.json','utf8')).version;
+          if(live!==process.env.EXPECTED) process.exit(1);
+          NODE
+            then
+              echo "Fixed Preview runtime ready: $expected"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Fixed Preview did not reach the candidate runtime in time.'
+          exit 1
+      - name: Google Places live candidate smoke
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 45 \
+            --retry 1 --retry-all-errors --retry-delay 2 \
+            -X POST "$base/api/itinerary-candidates" \
+            -H 'content-type: application/json' \
+            --data '{"request":"帶小孩去宜蘭一日，想看動物，也要雨天備案","location":"宜蘭","anchor":"斑比山丘","themes":["動物","室內"],"entityType":"attraction","limit":6}' \
+            --output /tmp/j2a-live.json --write-out '%{http_code}')
+          test "$code" = '200' || { echo "candidate API HTTP $code"; cat /tmp/j2a-live.json; exit 1; }
+          node - <<'NODE'
+          const fs=require('fs');
+          const body=JSON.parse(fs.readFileSync('/tmp/j2a-live.json','utf8'));
+          if(body?.planner?.version!=='candidate-planner-v1') throw new Error('planner-version-mismatch');
+          if(body?.planner?.strategy!=='places-query-expansion') throw new Error('planner-strategy-mismatch');
+          if(body?.planner?.aiAdapterReady!==true) throw new Error('ai-adapter-marker-missing');
+          if(!Array.isArray(body?.queriesTried) || body.queriesTried.length<2) throw new Error('query-expansion-not-exercised');
+          if(!Array.isArray(body?.candidates) || body.candidates.length<1) throw new Error('no-live-candidates');
+          for(const candidate of body.candidates){
+            if(!candidate.placeId || !candidate.title) throw new Error('invalid-live-candidate');
+          }
+          console.log(`live_candidates=${body.candidates.length} queries=${body.queriesTried.length} sample=${body.candidates.slice(0,3).map(x=>x.title).join(' | ')}`);
+          NODE
+      - name: Result
+        run: echo 'J2A GOOGLE PLACES LIVE PROVIDER GATE = PASS'
