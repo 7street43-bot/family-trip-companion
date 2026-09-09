@@ -6,6 +6,7 @@ import {
   routeLegMinutes,
   buildRoadTimeline
 } from '../public/itinerary-timeline-core.mjs';
+import { suggestStopDurationMinutes } from '../public/itinerary-duration-core.mjs';
 
 assert.equal(SCHEDULE_SCHEMA_VERSION, 1);
 assert.equal(parseClockMinutes('09:00'), 540);
@@ -14,6 +15,15 @@ assert.equal(parseClockMinutes('24:00'), null);
 assert.equal(normalizeDurationMinutes('', 90), 90);
 assert.equal(normalizeDurationMinutes(75, 90), 75);
 assert.equal(routeLegMinutes({ durationSeconds: 61 }), 2, 'road minutes round up to avoid early ETA');
+
+assert.equal(suggestStopDurationMinutes({ entityType:'restaurant', title:'親子餐廳' }), 75);
+assert.equal(suggestStopDurationMinutes({ entityType:'restaurant', title:'海景咖啡' }), 60);
+assert.equal(suggestStopDurationMinutes({ entityType:'activity', title:'手作體驗' }), 120);
+assert.equal(suggestStopDurationMinutes({ entityType:'attraction', title:'新竹市立動物園' }), 180);
+assert.equal(suggestStopDurationMinutes({ entityType:'attraction', title:'森林步道' }), 150);
+assert.equal(suggestStopDurationMinutes({ entityType:'attraction', title:'城隍廟' }), 45);
+assert.equal(suggestStopDurationMinutes({ entityType:'attraction', title:'一般景點' }), 90);
+assert.equal(suggestStopDurationMinutes({ entityType:'attraction', title:'一般景點', plannedDurationMinutes:55 }), 55, 'manual/saved duration must override smart suggestion');
 
 const route = {
   legs: [
@@ -52,4 +62,4 @@ assert.equal(rollover.returnLabel, '隔日 01:00');
 assert.equal(buildRoadTimeline({ departureTime:'09:00', stopKeys:['a'], route:{ legs:[] } }).error, 'route_legs_mismatch');
 assert.equal(buildRoadTimeline({ departureTime:'bad', stopKeys:['a'], route:{ legs:[{},{}] } }).error, 'invalid_departure_time');
 
-console.log('J2C-1 ROAD TIMELINE CORE CONTRACT = PASS');
+console.log('J2C-1.2 SMART DURATION + ROAD TIMELINE CORE CONTRACT = PASS');
