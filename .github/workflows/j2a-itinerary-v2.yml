@@ -74,7 +74,7 @@ jobs:
           const idleMaintenance=app.indexOf("scheduleIdleTask(async()=>{\n        await reloadData();");
           if(fastRead<0 || idleMaintenance<0 || fastRead>idleMaintenance) throw new Error('startup migrations are not deferred after fast local read');
           if(!app.includes('TwinUpdateManager.register')) throw new Error('update-manager ownership marker missing');
-          const allowedRuntime=(v.channel==='J2A' && v.version==='4.5.0-phase1.8-j2a.3.1') || (v.channel==='J2B' && ['4.5.0-phase1.9-j2b.1','4.5.0-phase1.9-j2b.2'].includes(v.version));
+          const allowedRuntime=(v.channel==='J2A' && v.version==='4.5.0-phase1.8-j2a.3.1') || (v.channel==='J2B' && ['4.5.0-phase1.9-j2b.1','4.5.0-phase1.9-j2b.2'].includes(v.version)) || (v.channel==='J2C' && ['4.5.0-phase1.10-j2c.1','4.5.0-phase1.10-j2c.1.1'].includes(v.version));
           if(!allowedRuntime) throw new Error(`wrong J2A-compatible runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts

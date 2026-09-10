@@ -7,6 +7,7 @@ on:
       - 'public/itinerary-v2*'
       - 'public/itinerary-origin*'
       - 'public/itinerary-route*'
+      - 'public/itinerary-timeline*'
       - 'netlify/functions/itinerary-origin-search.mjs'
       - 'netlify/functions/itinerary-route-matrix.mjs'
       - 'public/index.html'
@@ -15,6 +16,7 @@ on:
       - 'scripts/prepare-site.mjs'
       - 'tests/j2a-*.mjs'
       - 'tests/j2b-*.mjs'
+      - 'tests/j2c-*.mjs'
       - '.github/workflows/j2a-itinerary-v2.yml'
       - '.github/workflows/j2b-origin.yml'
       - '.github/workflows/j2b-route-matrix.yml'
@@ -25,12 +27,14 @@ on:
       - 'public/itinerary-v2*'
       - 'public/itinerary-origin*'
       - 'public/itinerary-route*'
+      - 'public/itinerary-timeline*'
       - 'netlify/functions/itinerary-route-matrix.mjs'
       - 'public/index.html'
       - 'public/sw.js'
       - 'public/version.json'
       - 'tests/j2a-*.mjs'
       - 'tests/j2b-*.mjs'
+      - 'tests/j2c-*.mjs'
       - '.github/workflows/j2b-route-matrix.yml'
   workflow_dispatch:
 
@@ -45,22 +49,26 @@ jobs:
       - uses: actions/checkout@v5
       - name: Prepare publish artifact
         run: node scripts/prepare-site.mjs
-      - name: Syntax and route contracts
+      - name: Syntax and route/timeline contracts
         run: |
           set -euo pipefail
           node --check public/itinerary-v2-core.mjs
           node --check public/itinerary-v2.mjs
           node --check public/itinerary-origin.mjs
           node --check public/itinerary-route.mjs
+          node --check public/itinerary-timeline-core.mjs
+          node --check public/itinerary-timeline.mjs
+          node --check public/itinerary-timeline-input-sync.mjs
           node --check netlify/functions/itinerary-origin-search.mjs
           node --check netlify/functions/itinerary-route-matrix.mjs
           node --check public/sw.js
           node --check public/app.js
+          node --test tests/j2c-timeline.test.mjs
           node --test tests/j2b-route-matrix.test.mjs
           node --test tests/j2b-origin.test.mjs
           node --test tests/j2a-itinerary-v2.test.mjs
           node --test tests/j2a-candidate-pool.test.mjs
-      - name: J2B-2 isolation invariants
+      - name: J2B-2 + J2C-1.1 isolation invariants
         run: |
           set -euo pipefail
           node - <<'NODE'
@@ -69,17 +77,27 @@ jobs:
           const sw=fs.readFileSync('public/sw.js','utf8');
           const core=fs.readFileSync('public/itinerary-v2-core.mjs','utf8');
           const route=fs.readFileSync('public/itinerary-route.mjs','utf8');
+          const timelineCore=fs.readFileSync('public/itinerary-timeline-core.mjs','utf8');
+          const timeline=fs.readFileSync('public/itinerary-timeline.mjs','utf8');
+          const inputSync=fs.readFileSync('public/itinerary-timeline-input-sync.mjs','utf8');
           const provider=fs.readFileSync('netlify/functions/itinerary-route-matrix.mjs','utf8');
           const v=JSON.parse(fs.readFileSync('public/version.json','utf8'));
-          for(const needle of ['itinerary-route.css','itinerary-route.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
-          for(const needle of ['itinerary-route.css','itinerary-route.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
-          if(!core.includes("const MODEL_VERSION = 2")) throw new Error('J2B-2 changed itinerary modelVersion');
+          for(const needle of ['itinerary-route.css','itinerary-route.mjs','itinerary-timeline.css','itinerary-timeline.mjs','itinerary-timeline-input-sync.mjs']) if(!html.includes(needle)) throw new Error(`missing ${needle} in index`);
+          for(const needle of ['itinerary-route.css','itinerary-route.mjs','itinerary-timeline.css','itinerary-timeline-core.mjs','itinerary-timeline.mjs','itinerary-timeline-input-sync.mjs']) if(!sw.includes(needle)) throw new Error(`missing ${needle} in service worker`);
+          if(!core.includes("const MODEL_VERSION = 2")) throw new Error('J2C changed itinerary modelVersion');
           if(!route.includes("provider: 'google-routes'")) throw new Error('routePlan persistence missing');
           if(!route.includes("button.matches('[data-j2b2-calc]')")) throw new Error('explicit route action missing');
           if(!provider.includes("path: '/api/itinerary-route-matrix'")) throw new Error('route endpoint path missing');
           if(!provider.includes('originIndex,destinationIndex,status,condition,distanceMeters,duration')) throw new Error('required route field mask missing');
           if(!provider.includes("routingPreference: 'TRAFFIC_UNAWARE'")) throw new Error('deterministic planning preference missing');
-          if(v.channel!=='J2B' || v.version!=='4.5.0-phase1.9-j2b.2') throw new Error(`wrong J2B-2 runtime:${v.version}/${v.channel}`);
+          if(!timelineCore.includes('SCHEDULE_SCHEMA_VERSION = 1')) throw new Error('timeline schedule schema marker missing');
+          if(!timeline.includes("button.matches('[data-j2c-apply]')")) throw new Error('explicit timeline apply action missing');
+          if(!timeline.includes("scheduleSchemaVersion: SCHEDULE_SCHEMA_VERSION")) throw new Error('timeline persistence marker missing');
+          if(!timeline.includes("provider: 'google-routes'")) throw new Error('timeline provider lineage missing');
+          if(!inputSync.includes("document.addEventListener('input'")) throw new Error('real-device duration input sync missing');
+          if(!inputSync.includes("[data-j2c-apply], [data-it2-save]")) throw new Error('pre-apply/save duration flush missing');
+          const allowedRuntime=(v.channel==='J2B' && v.version==='4.5.0-phase1.9-j2b.2') || (v.channel==='J2C' && ['4.5.0-phase1.10-j2c.1','4.5.0-phase1.10-j2c.1.1'].includes(v.version));
+          if(!allowedRuntime) throw new Error(`wrong J2B/J2C runtime:${v.version}/${v.channel}`);
           NODE
       - name: Existing frontend regression contracts
         run: |
@@ -88,7 +106,7 @@ jobs:
           node --test tests/journal-j1f-ui.test.mjs
           node --test tests/journal-j1g-runtime.test.mjs
       - name: Result
-        run: echo 'J2B-2 ROUTE CONTRACT + J2B-1/J2A COMPATIBILITY = PASS'
+        run: echo 'J2C-1.1 TIMELINE + J2B-2 ROUTE + J2B-1/J2A COMPATIBILITY = PASS'
 
   webkit-e2e:
     runs-on: ubuntu-latest
@@ -107,6 +125,10 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0; sleep 1; done
           cat /tmp/j2b2-http.log
           exit 1
+      - name: J2C-1.1 mobile and desktop road timeline gate
+        env:
+          J2C_BASE_URL: http://127.0.0.1:4173
+        run: node tests/j2c-timeline-webkit-e2e.mjs
       - name: J2B-2 mobile and desktop route gate
         env:
           J2B2_BASE_URL: http://127.0.0.1:4173
@@ -120,7 +142,7 @@ jobs:
           J2A_BASE_URL: http://127.0.0.1:4173
         run: node tests/j2a-webkit-e2e.mjs
       - name: Result
-        run: echo 'J2B-2 WEBKIT ROUTE + J2B-1/J2A REGRESSION = PASS'
+        run: echo 'J2C-1.1 WEBKIT TIMELINE + J2B-2/J2B-1/J2A REGRESSION = PASS'
 
   live-route-smoke:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/preview'
@@ -155,7 +177,7 @@ jobs:
             fi
             sleep 5
           done
-          echo 'J2B-2 runtime did not become ready in time.'
+          echo 'J2B/J2C runtime did not become ready in time.'
           exit 1
       - name: Resolve live Google Places waypoints
         run: |
@@ -215,4 +237,4 @@ jobs:
           console.log(`route_current_s=${body.current.totalDurationSeconds} route_suggested_s=${body.suggested.totalDurationSeconds} savings_s=${body.savingsSeconds}`);
           NODE
       - name: Result
-        run: echo 'J2B-2 GOOGLE ROUTES LIVE MATRIX GATE = PASS'
+        run: echo 'J2C-1.1 / J2B-2 GOOGLE ROUTES LIVE MATRIX GATE = PASS'
