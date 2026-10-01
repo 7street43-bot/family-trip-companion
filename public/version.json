@@ -2,6 +2,6 @@
   "version": "4.5.0-phase1.10-j2c.1.1",
   "cache": "twin-trip-v4.5.0-phase1.10-j2c.1.1",
   "builtAt": "2026-10-01",
-  "channel": "FAMILY_CLOUD_MCP_PREVIEW_APPROVED",
+  "channel": "J2C",
   "previewFeature": "email-magic-link+family-sharing+journal-mcp"
 }
