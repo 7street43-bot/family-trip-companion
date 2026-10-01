@@ -11,6 +11,7 @@
 - No service-role credentials
 - Mutations preserve idempotency through the existing Journal gateway
 - Journal RLS and Family Workspace membership remain authoritative
+- Preview backend change policy: explicitly approved; Production remains blocked until all Live gates pass.
 
 ## MCP tools
 
