@@ -1,15 +1,30 @@
-# Journal GPT Connector｜J1F
+# Journal GPT Connector｜J1F → MCP Preview
 
 ## Current implemented gateway
 
-- Endpoint: `POST /api/journal-gpt`
+- Existing command gateway: `POST /api/journal-gpt`
+- New scoped MCP endpoint: `POST /api/journal-mcp`
+- OAuth Protected Resource Metadata: `/.well-known/oauth-protected-resource`
+- Authorization UI candidate: `/oauth/consent/`
 - Authentication: user Supabase access token (`Authorization: Bearer ...`)
 - Actor source: server-forced `gpt`
 - No service-role credentials
-- Mutations require a UUID `mutationId` or `Idempotency-Key`
-- Commands share the same J1D client contract used by browser clients.
+- Mutations preserve idempotency through the existing Journal gateway
+- Journal RLS and Family Workspace membership remain authoritative
 
-Supported commands:
+## MCP tools
+
+- `family_list_workspaces`
+- `journal_list_entries`
+- `journal_get_entry`
+- `journal_create_entry`
+- `journal_update_entry`
+- `journal_set_archived`
+- `journal_mutate_block`
+
+The MCP server does **not** expose generic SQL, Supabase administration, or unrelated application tables.
+
+## Existing Journal command coverage
 
 - `createEntry`
 - `updateEntry`
@@ -23,23 +38,33 @@ Supported commands:
 - `listEntries`
 - `getEntry`
 
-## ChatGPT Project activation boundary (2026-09-07)
+## Activation gates
 
-The backend is ready for user-scoped AI writes, but a Plus account cannot currently attach a private full-MCP app with write/modify actions directly to a Project. Do not work around this by storing a Supabase JWT or service-role key in Project instructions.
+The code path is Preview-ready, but Live activation remains fail-closed until all external gates pass:
 
-When account-side write-capable custom apps are available, use a remote MCP app with Supabase OAuth 2.1/OIDC. Supabase Auth can act as an OAuth 2.1 authorization server and issue normal user JWTs, so existing Journal RLS and workspace membership rules remain authoritative.
+1. Email Auth Custom SMTP is configured and Live Email Login passes.
+2. Supabase OAuth 2.1 Server is enabled.
+3. Authorization Path is exactly `/oauth/consent/` on the fixed Production Site URL.
+4. OAuth client registration / dynamic registration is configured according to the consuming MCP host.
+5. OAuth access-token validation and Family Workspace RLS are verified with a real non-production user/workspace first.
+6. ChatGPT account/workspace supports write-capable custom MCP apps.
+7. Create/read/update/conflict/replay tests pass before Production promotion.
 
-## Future activation sequence
+## Current OpenAI product boundary｜2026-10-01
 
-1. Enable Supabase OAuth 2.1 Server.
-2. Configure the production authorization path (planned: `/oauth/consent`).
-3. Register the ChatGPT/MCP client or enable MCP dynamic client registration where appropriate.
-4. Use asymmetric JWT signing (RS256/ES256) before requesting OIDC `openid` ID tokens.
-5. Remote MCP tools call the Journal gateway using the user's OAuth access token; never use service role.
-6. Keep write actions confirmation-aware and preserve `mutationId` idempotency.
-7. Test create/read/update/conflict/replay on a non-production workspace before enabling daily use.
+OpenAI currently documents full MCP write/modify support for ChatGPT Business, Enterprise and Edu workspaces. Pro supports custom MCP in developer mode for read/fetch, but not full MCP write actions. Therefore the application-side MCP can be prepared independently, while the final ChatGPT write Live Gate depends on the account/workspace capability available at activation time.
 
-References:
+## Security rules
+
+- Never store a Supabase JWT, refresh token, secret key, or service-role key in ChatGPT Project instructions.
+- User authorization must occur through OAuth 2.1 / PKCE and the explicit consent UI.
+- MCP calls use the signed-in user's token, so existing RLS applies.
+- Write tools remain confirmation-aware through MCP tool annotations and optimistic-lock versions.
+- Conflicts fail closed; GPT must not overwrite a newer server version.
+
+## References
+
 - Supabase OAuth 2.1 Server: https://supabase.com/docs/guides/auth/oauth-server
 - Supabase MCP Authentication: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
-- OpenAI custom MCP apps / developer mode: https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt-beta
+- OpenAI MCP / plugin server guidance: https://developers.openai.com/plugins/build/mcp-server
+- OpenAI Developer Mode / MCP availability: https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-apps-in-chatgpt-beta
