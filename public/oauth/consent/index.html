@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#f8f6f1" />
+  <title>雙寶出遊趣｜授權</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#28251f;background:#f8f6f1}
+    *{box-sizing:border-box}body{margin:0;padding:24px}.card{max-width:560px;margin:7vh auto;background:#fff;border-radius:20px;padding:24px;box-shadow:0 12px 36px rgba(0,0,0,.08)}
+    h1{font-size:24px;margin:0 0 10px}.muted{color:#6c675d;line-height:1.55}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    button,input{font:inherit;border-radius:12px;padding:12px 14px}input{width:100%;border:1px solid #d8d2c8;margin:8px 0}button{border:0;cursor:pointer;font-weight:700}
+    .primary{background:#28251f;color:#fff}.secondary{background:#eeeae3;color:#28251f}.danger{background:#f3e7e5;color:#7d302a}.detail{background:#f7f4ee;border-radius:12px;padding:12px;margin:14px 0;word-break:break-word}.status{margin-top:12px;line-height:1.45}.error{color:#9b2c2c}.ok{color:#296b3a}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>雙寶出遊趣授權</h1>
+    <p class="muted">允許 ChatGPT 以你的登入身份讀取或維護旅遊日誌。資料權限仍由 Family Workspace 與 Supabase RLS 控制。</p>
+    <section id="loginBox" hidden>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" placeholder="name@example.com" />
+      <button id="sendLink" class="primary" type="button">寄送登入連結</button>
+    </section>
+    <section id="consentBox" hidden>
+      <div class="detail" id="clientDetail"></div>
+      <div class="row">
+        <button id="approve" class="primary" type="button">允許</button>
+        <button id="deny" class="danger" type="button">拒絕</button>
+      </div>
+    </section>
+    <div id="status" class="status muted">正在讀取授權要求…</div>
+  </main>
+  <script type="module" src="./consent.js"></script>
+</body>
+</html>
