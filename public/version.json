@@ -1,6 +1,7 @@
 {
   "version": "4.5.0-phase1.10-j2c.1.1",
   "cache": "twin-trip-v4.5.0-phase1.10-j2c.1.1",
-  "builtAt": "2026-09-09",
-  "channel": "J2C"
+  "builtAt": "2026-10-01",
+  "channel": "EMAIL_AUTH_PREVIEW",
+  "previewFeature": "email-magic-link"
 }
