@@ -6,6 +6,7 @@
     config: null,
     client: null,
     workspaceId: null,
+    userId: null,
     lastChangeSeq: 0,
     initPromise: null,
     subscription: null,
@@ -19,6 +20,8 @@
   const ALLOWED_STORES = new Set([...LOCAL_STORES,'journals']);
   const META_KEY = 'cloudSyncV1';
   const BACKUP_KEY = 'preCloudSyncBackup';
+  const ACCOUNT_BACKUP_PREFIX = 'cloudAccountSwitchBackup';
+  const WORKSPACE_BACKUP_PREFIX = 'cloudWorkspaceSwitchBackup';
 
   async function fetchConfig() {
     const res = await fetch('/api/cloud-config', { cache:'no-store' });
@@ -44,6 +47,7 @@
       const { data, error } = await STATE.client.auth.getSession();
       if (error) throw error;
       await loadMeta();
+      if (data?.session?.user) await enforceAccountBoundary(data.session.user);
       return { configured:true, authenticated:!!data?.session, user:data?.session?.user || null, siteOrigin:cfg.siteOrigin, originMatch:location.origin===cfg.siteOrigin };
     })().catch(err => {
       STATE.initPromise = null;
@@ -102,6 +106,7 @@
       STATE.subscription = null;
     }
     STATE.workspaceId = null;
+    STATE.userId = null;
     STATE.lastChangeSeq = 0;
     const { error } = await c.auth.signOut();
     if (error) throw error;
@@ -112,16 +117,114 @@
     const { data, error } = await c.auth.getSession();
     if (error) throw error;
     if (!data?.session) throw new Error('cloud_sync_not_authenticated');
+    STATE.userId = String(data.session.user?.id || '');
     return { c, session:data.session };
   }
 
+  async function accessibleWorkspace(c, workspaceId) {
+    const id = String(workspaceId || '');
+    if (!id) return null;
+    const { data, error } = await c.from('family_workspaces')
+      .select('id,name,created_by,is_primary,created_at')
+      .eq('id', id)
+      .limit(1);
+    if (error) throw error;
+    return data?.[0] || null;
+  }
+
   async function ensureWorkspace(name='我的家庭') {
-    const { c } = await requireSession();
+    const { c, session } = await requireSession();
+    if (STATE.workspaceId) {
+      const current = await accessibleWorkspace(c, STATE.workspaceId);
+      if (current) return STATE.workspaceId;
+      STATE.workspaceId = null;
+      STATE.lastChangeSeq = 0;
+    }
     const { data, error } = await c.rpc('ensure_personal_family_workspace', { workspace_name:name });
     if (error) throw error;
     STATE.workspaceId = String(data || '');
+    STATE.userId = String(session.user?.id || '');
     if (!STATE.workspaceId) throw new Error('workspace_bootstrap_failed');
+    const meta = await loadMeta();
+    meta.workspaceId = STATE.workspaceId;
+    meta.userId = STATE.userId;
+    await saveMeta(meta);
     return STATE.workspaceId;
+  }
+
+  async function listWorkspaces() {
+    const { c, session } = await requireSession();
+    const uid = String(session.user?.id || '');
+    const { data:workspaces, error:wErr } = await c.from('family_workspaces')
+      .select('id,name,created_by,is_primary,created_at')
+      .order('created_at', { ascending:true });
+    if (wErr) throw wErr;
+    const { data:memberships, error:mErr } = await c.from('family_workspace_members')
+      .select('workspace_id,user_id,role,created_at')
+      .eq('user_id', uid);
+    if (mErr) throw mErr;
+    const roleByWorkspace = new Map((memberships || []).map(row => [String(row.workspace_id), String(row.role || 'member')]));
+    return (workspaces || []).map(row => ({
+      id:String(row.id),
+      name:String(row.name || '我的家庭'),
+      role:roleByWorkspace.get(String(row.id)) || (String(row.created_by)===uid ? 'owner' : 'member'),
+      isPrimary:!!row.is_primary,
+      active:String(row.id)===String(STATE.workspaceId || '')
+    }));
+  }
+
+  async function createFamilyInvite(validHours=24) {
+    const { c } = await requireSession();
+    const workspaceId = STATE.workspaceId || await ensureWorkspace();
+    const hours = Math.max(1, Math.min(Number(validHours)||24, 168));
+    const { data, error } = await c.rpc('family_create_invite', {
+      p_workspace_id:workspaceId,
+      p_valid_hours:hours
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function redeemFamilyInvite(token) {
+    const { c } = await requireSession();
+    const normalized = String(token || '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized)) {
+      throw new Error('invite_token_invalid');
+    }
+    const { data, error } = await c.rpc('family_redeem_invite', { p_token:normalized });
+    if (error) throw error;
+    const workspaceId = String(data?.workspaceId || '');
+    if (!workspaceId) throw new Error('invite_workspace_missing');
+    const switched = await switchWorkspace(workspaceId, { remoteAuthoritative:true, reason:'invite_redeem' });
+    return { ...data, switchResult:switched };
+  }
+
+  async function revokeFamilyInvite(inviteId) {
+    const { c } = await requireSession();
+    const { data, error } = await c.rpc('family_revoke_invite', { p_invite_id:String(inviteId || '') });
+    if (error) throw error;
+    return data;
+  }
+
+  async function removeFamilyMember(workspaceId, userId) {
+    const { c } = await requireSession();
+    const { data, error } = await c.rpc('family_remove_member', {
+      p_workspace_id:String(workspaceId || ''),
+      p_user_id:String(userId || '')
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function leaveFamilyWorkspace(workspaceId=null) {
+    const { c } = await requireSession();
+    const id = String(workspaceId || STATE.workspaceId || '');
+    if (!id) throw new Error('workspace_required');
+    const { data, error } = await c.rpc('family_leave_workspace', { p_workspace_id:id });
+    if (error) throw error;
+    STATE.workspaceId = null;
+    STATE.lastChangeSeq = 0;
+    return data;
   }
 
   function requireStore(storeName) {
@@ -194,13 +297,15 @@
     meta.records = meta.records && typeof meta.records === 'object' ? meta.records : {};
     STATE.lastChangeSeq = Math.max(STATE.lastChangeSeq, meta.cursor);
     STATE.lastSyncAt = meta.lastSyncAt || null;
-    if (meta.workspaceId) STATE.workspaceId = meta.workspaceId;
+    if (meta.workspaceId) STATE.workspaceId = String(meta.workspaceId);
+    if (meta.userId) STATE.userId = String(meta.userId);
     return meta;
   }
 
   async function saveMeta(meta) {
     meta.cursor = Number(meta.cursor)||0;
     meta.workspaceId = STATE.workspaceId || meta.workspaceId || null;
+    meta.userId = STATE.userId || meta.userId || null;
     meta.lastSyncAt = new Date().toISOString();
     STATE.lastChangeSeq = Math.max(STATE.lastChangeSeq, meta.cursor);
     STATE.lastSyncAt = meta.lastSyncAt;
@@ -213,12 +318,53 @@
     return out;
   }
 
+  async function clearLocalSyncStores() {
+    for (const store of LOCAL_STORES) await TwinDB.replaceStore(store, []);
+  }
+
+  async function backupLocal(key) {
+    if (!window.TwinDB) return null;
+    const value = await TwinDB.snapshot();
+    const savedAt = new Date().toISOString();
+    await TwinDB.put('meta', { key, value, savedAt });
+    return { key, savedAt };
+  }
+
   async function backupLocalOnce() {
     const prior = await TwinDB.get('meta', BACKUP_KEY).catch(()=>null);
     if (prior?.value) return false;
-    const value = await TwinDB.snapshot();
-    await TwinDB.put('meta', { key:BACKUP_KEY, value, savedAt:new Date().toISOString() });
+    await backupLocal(BACKUP_KEY);
     return true;
+  }
+
+  async function enforceAccountBoundary(user) {
+    if (!window.TwinDB || !user?.id) return;
+    const uid = String(user.id);
+    const meta = await loadMeta();
+    if (meta.userId && String(meta.userId) !== uid) {
+      const stamp = Date.now();
+      await backupLocal(`${ACCOUNT_BACKUP_PREFIX}:${meta.userId}:${stamp}`);
+      await clearLocalSyncStores();
+      STATE.workspaceId = null;
+      STATE.lastChangeSeq = 0;
+      STATE.lastSyncAt = null;
+      STATE.userId = uid;
+      const reset = {
+        cursor:0,
+        records:{},
+        initialized:false,
+        workspaceId:null,
+        userId:uid,
+        accountSwitchedAt:new Date().toISOString()
+      };
+      await TwinDB.put('meta', { key:META_KEY, value:reset, savedAt:reset.accountSwitchedAt });
+      return;
+    }
+    STATE.userId = uid;
+    if (!meta.userId) {
+      meta.userId = uid;
+      await TwinDB.put('meta', { key:META_KEY, value:meta, savedAt:new Date().toISOString() });
+    }
   }
 
   async function applyRemoteRow(row, meta) {
@@ -263,11 +409,13 @@
 
   async function bootstrap() {
     if (!window.TwinDB) throw new Error('local_db_unavailable');
-    await requireSession();
+    const { session } = await requireSession();
+    await enforceAccountBoundary(session.user);
     const workspaceId = await ensureWorkspace();
     let meta = await loadMeta();
     meta.workspaceId = workspaceId;
-    if (meta.initialized) return { initialized:false, reason:'already_initialized' };
+    meta.userId = String(session.user?.id || '');
+    if (meta.initialized && String(meta.workspaceId || '') === workspaceId) return { initialized:false, reason:'already_initialized' };
 
     await backupLocalOnce();
     const remote = await pullSince(0,{limit:5000});
@@ -309,7 +457,8 @@
     if (STATE.syncing) return { status:'busy' };
     STATE.syncing=true; STATE.lastError=null;
     try {
-      await requireSession();
+      const { session } = await requireSession();
+      await enforceAccountBoundary(session.user);
       STATE.workspaceId = STATE.workspaceId || await ensureWorkspace();
       let meta=await loadMeta();
       if(!meta.initialized) await bootstrap();
@@ -354,6 +503,55 @@
     finally{STATE.syncing=false;}
   }
 
+  async function switchWorkspace(workspaceId, { remoteAuthoritative=true, reason='manual' }={}) {
+    if (!window.TwinDB) throw new Error('local_db_unavailable');
+    const { c, session } = await requireSession();
+    const target = await accessibleWorkspace(c, workspaceId);
+    if (!target) throw new Error('workspace_access_denied');
+    const targetId = String(target.id);
+    const currentId = String(STATE.workspaceId || '');
+    const currentMeta = await loadMeta();
+    if (currentId === targetId && String(currentMeta.workspaceId || '') === targetId) {
+      return { status:'already_active', workspaceId:targetId, workspaceName:target.name };
+    }
+
+    if (currentId && currentMeta.initialized) {
+      const syncResult = await syncNow();
+      if (syncResult?.status !== 'ok' && syncResult?.status !== 'busy') throw new Error('workspace_pre_switch_sync_failed');
+    }
+
+    const stamp = Date.now();
+    const backup = await backupLocal(`${WORKSPACE_BACKUP_PREFIX}:${currentId || 'none'}:${stamp}`);
+    if (remoteAuthoritative) await clearLocalSyncStores();
+    if (STATE.subscription) {
+      try { await c.removeChannel(STATE.subscription); } catch (_) {}
+      STATE.subscription = null;
+    }
+
+    STATE.workspaceId = targetId;
+    STATE.userId = String(session.user?.id || '');
+    STATE.lastChangeSeq = 0;
+    STATE.lastSyncAt = null;
+    const reset = {
+      cursor:0,
+      records:{},
+      initialized:false,
+      workspaceId:targetId,
+      userId:STATE.userId,
+      switchedAt:new Date().toISOString(),
+      switchReason:String(reason || 'manual')
+    };
+    await TwinDB.put('meta', { key:META_KEY, value:reset, savedAt:reset.switchedAt });
+    const bootstrapResult = await bootstrap();
+    return {
+      status:'switched',
+      workspaceId:targetId,
+      workspaceName:String(target.name || '我的家庭'),
+      backup,
+      bootstrap:bootstrapResult
+    };
+  }
+
   async function cloudGate() {
     const status=await init();
     const results=[];
@@ -363,7 +561,7 @@
     results.push({id:'site-origin',status:originMatch?'PASS':'FAIL',detail:originMatch?`正式 Site OK｜${location.origin}`:`目前 ${location.origin}｜應為 ${status.siteOrigin||'未設定'}`});
     if(!originMatch)return results;
     const s=await getStatus();
-    results.push({id:'auth',status:s.authenticated?'PASS':'WAIT',detail:s.authenticated?`已登入 ${s.user?.email||''}`:'請先使用 Google 登入'});
+    results.push({id:'auth',status:s.authenticated?'PASS':'WAIT',detail:s.authenticated?`已登入 ${s.user?.email||''}`:'請先使用 Email 登入'});
     if(!s.authenticated)return results;
     const wid=await ensureWorkspace();
     results.push({id:'workspace',status:wid?'PASS':'FAIL',detail:wid?'Family Workspace OK':'Workspace 建立失敗'});
@@ -384,8 +582,9 @@
   }
 
   window.TwinCloudSync = {
-    init,getStatus,signInWithGoogle,signOut,ensureWorkspace,pullSince,pushRecord,
-    bootstrap,syncNow,cloudGate,subscribe,
+    init,getStatus,signInWithGoogle,signOut,ensureWorkspace,listWorkspaces,
+    createFamilyInvite,redeemFamilyInvite,revokeFamilyInvite,removeFamilyMember,leaveFamilyWorkspace,switchWorkspace,
+    pullSince,pushRecord,bootstrap,syncNow,cloudGate,subscribe,
     get configured(){return STATE.configured;},
     get workspaceId(){return STATE.workspaceId;}
   };
