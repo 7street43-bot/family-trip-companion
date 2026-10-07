@@ -128,3 +128,119 @@ async function resolvePlaces(places=[]){
   resolved.sort((a,b)=>b.visits.length-a.visits.length||a.name.localeCompare(b.name,'zh-TW'));
   return {resolved,unresolved};
 }
+
+function ensureLeaflet(){
+  if(globalThis.L?.map)return Promise.resolve(globalThis.L);
+  if(state.leafletPromise)return state.leafletPromise;
+  state.leafletPromise=new Promise((resolve,reject)=>{
+    if(typeof document==='undefined')return reject(new Error('leaflet_document_unavailable'));
+    if(!document.querySelector('link[data-leaflet-footprint]')){
+      const link=document.createElement('link');
+      link.rel='stylesheet';link.href=LEAFLET_CSS;link.dataset.leafletFootprint='1';
+      document.head.appendChild(link);
+    }
+    const existing=document.querySelector('script[data-leaflet-footprint]');
+    if(existing){
+      existing.addEventListener('load',()=>globalThis.L?.map?resolve(globalThis.L):reject(new Error('leaflet_missing')),{once:true});
+      existing.addEventListener('error',()=>reject(new Error('leaflet_load_failed')),{once:true});
+      return;
+    }
+    const script=document.createElement('script');
+    script.src=LEAFLET_JS;script.async=true;script.dataset.leafletFootprint='1';
+    script.addEventListener('load',()=>globalThis.L?.map?resolve(globalThis.L):reject(new Error('leaflet_missing')),{once:true});
+    script.addEventListener('error',()=>reject(new Error('leaflet_load_failed')),{once:true});
+    document.head.appendChild(script);
+  }).catch(err=>{state.leafletPromise=null;throw err;});
+  return state.leafletPromise;
+}
+
+function overlay(){
+  let el=document.getElementById('journalYearMap');
+  if(!el&&typeof document!=='undefined'){
+    el=document.createElement('div');
+    el.id='journalYearMap';el.className='journal-map-overlay';el.hidden=true;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function statusHtml(){
+  if(state.loading)return '<div class="journal-map-status">正在整理年度足跡…</div>';
+  if(state.error)return `<div class="journal-map-error"><p>${esc(state.error)}</p><button type="button" data-footprint-close>關閉</button></div>`;
+  if(!state.resolved.length)return '<div class="journal-map-status">這一年沒有可定位的足跡。</div>';
+  return '';
+}
+
+function mapShellHtml(){
+  const resolved=state.resolved.length,unresolved=state.unresolved.length,total=state.places.length;
+  return `<section class="journal-map-panel"><div class="journal-map-head"><div><h2>${esc(state.year)} 年度足跡地圖</h2><small>${resolved} / ${total} 個地點已定位${unresolved?`｜${unresolved} 個待確認`:''}</small></div><button type="button" data-footprint-close>關閉</button></div><div id="journalFootprintMap" class="journal-footprint-map" aria-label="${esc(state.year)} 年度旅遊足跡地圖"></div>${unresolved?`<details class="journal-map-unresolved"><summary>查看 ${unresolved} 個尚未定位地點</summary><div>${state.unresolved.map(x=>`<span>${esc(x.name)}</span>`).join('')}</div></details>`:''}<small class="journal-map-note">地圖只在你開啟時載入；點足跡可查看日期並回到該篇日誌。</small></section>`;
+}
+
+function markerPopup(place){
+  const visits=place.visits.slice(0,6);
+  const more=place.visits.length-visits.length;
+  return `<div class="journal-map-popup"><strong>${esc(place.name)}</strong>${place.address?`<small>${esc(place.address)}</small>`:''}<div class="journal-map-popup-visits">${visits.map(v=>`<button type="button" data-footprint-entry="${esc(v.entryId)}"><span>${esc(v.date||'日期未設定')}</span><b>${esc(v.title)}</b></button>`).join('')}${more>0?`<small>另有 ${more} 筆紀錄</small>`:''}</div>${place.googleMapsUrl?`<a href="${esc(place.googleMapsUrl)}" target="_blank" rel="noopener noreferrer">在 Google Maps 開啟</a>`:''}</div>`;
+}
+
+function renderLeaflet(L){
+  state.map?.remove?.();state.map=null;
+  const host=document.getElementById('journalFootprintMap');if(!host||!state.resolved.length)return;
+  const map=L.map(host,{zoomControl:true,attributionControl:true});
+  state.map=map;
+  L.tileLayer(OSM_TILE,{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  const latlngs=[];
+  for(const place of state.resolved){
+    const latlng=[place.latitude,place.longitude];latlngs.push(latlng);
+    const marker=L.circleMarker(latlng,{
+      radius:Math.min(13,7+Math.log2(Math.max(1,place.visits.length))*2),
+      weight:2,fillOpacity:.82
+    }).addTo(map);
+    marker.bindPopup(markerPopup(place),{maxWidth:320,minWidth:210});
+  }
+  if(latlngs.length===1)map.setView(latlngs[0],12);
+  else map.fitBounds(L.latLngBounds(latlngs),{padding:[32,32],maxZoom:12});
+  setTimeout(()=>map.invalidateSize(),0);
+}
+
+function render(){
+  const el=overlay();if(!el)return;
+  el.hidden=false;
+  if(state.loading||state.error||!state.resolved.length){el.innerHTML=statusHtml();return;}
+  el.innerHTML=mapShellHtml();
+  ensureLeaflet().then(renderLeaflet).catch(err=>{state.error='地圖元件載入失敗，請稍後再試。';render();console.error(err);});
+}
+
+function closeMap(){
+  state.map?.remove?.();state.map=null;state.error='';state.loading=false;
+  const el=overlay();if(el){el.hidden=true;el.innerHTML='';}
+  document?.body?.classList?.remove('journal-map-open');
+}
+
+export async function openYearFootprintMap(){
+  const snap=yearlySourceSnapshot(),entries=Array.isArray(snap.entries)?snap.entries:[];
+  state.year=Number(snap.year);state.places=buildFootprintPlaces(entries);state.resolved=[];state.unresolved=[];state.error='';state.loading=true;
+  document?.body?.classList?.add('journal-map-open');render();
+  try{
+    if(!entries.length)throw new Error('請先產生該年度回顧，再開啟足跡地圖。');
+    if(!state.places.length)throw new Error('這一年日誌還沒有填寫地點。');
+    const result=await resolvePlaces(state.places);
+    state.resolved=result.resolved;state.unresolved=result.unresolved;state.loading=false;render();
+  }catch(err){state.loading=false;state.error=String(err?.message||err||'年度足跡載入失敗。');render();}
+}
+
+function mount(){
+  if(state.mounted)return;state.mounted=true;
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest?.('[data-footprint-close],[data-footprint-entry]');if(!t)return;
+    if(t.matches('[data-footprint-close]'))return closeMap();
+    const id=t.dataset.footprintEntry;
+    if(id){closeMap();journalShell.openEntry(id).catch(err=>console.error('open journal entry failed',err));}
+  });
+  document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&overlay()?.hidden===false)closeMap();});
+}
+if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
+
+export const __test={CACHE_KEY,CACHE_TTL_MS,MAX_REMOTE_RESOLVE,LEAFLET_JS,LEAFLET_CSS,OSM_TILE,keyOf,locationRow};
