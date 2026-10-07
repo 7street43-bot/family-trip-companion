@@ -108,5 +108,15 @@ jobs:
           code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /tmp/noauth.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"command":"createEntry","input":{"entryDate":"2026-09-07","summary":"must-not-write"},"mutationId":"11111111-1111-4111-8111-111111111111"}' "$url")
           test "$code" = 401 || { cat /tmp/noauth.json; exit 1; }
           grep -Fq 'missing_bearer_token' /tmp/noauth.json
+      - name: MCP protected-resource and auth smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://preview--comfy-heliotrope-475c71.netlify.app'
+          curl --fail --silent --show-error --location "$base/.well-known/oauth-protected-resource" -o /tmp/resource.json
+          grep -Fq 'https://edjnwbticmkajwdqbgjz.supabase.co/auth/v1' /tmp/resource.json
+          code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /tmp/mcp-noauth.json -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' "$base/api/journal-mcp")
+          test "$code" = 401 || { cat /tmp/mcp-noauth.json; exit 1; }
+          grep -Fq 'invalid_token' /tmp/mcp-noauth.json
       - name: Result
-        run: echo 'J1F PREVIEW HISTORY + SEARCH + AUTH GATE = PASS'
+        run: echo 'J1F PREVIEW HISTORY + SEARCH + GPT/MCP AUTH GATE = PASS'
