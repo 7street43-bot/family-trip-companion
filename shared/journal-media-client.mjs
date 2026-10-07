@@ -79,7 +79,14 @@ export function createJournalMediaClient({source,transport}){
 
   const archive=(args)=>mutate('archive',{...args,payload:{},mutationId:args.mutationId||newUuid()});
   const restore=(args)=>mutate('restore',{...args,payload:{},mutationId:args.mutationId||newUuid()});
-  const signedUrl=async({storagePath,expiresIn=900})=>transport.createSignedUrl(BUCKET,String(storagePath),Math.max(60,Math.min(3600,Number(expiresIn)||900)));
+  const boundedExpiry=expiresIn=>Math.max(60,Math.min(3600,Number(expiresIn)||900));
+  const signedUrl=async({storagePath,expiresIn=900})=>transport.createSignedUrl(BUCKET,String(storagePath),boundedExpiry(expiresIn));
+  const signedUrls=async({storagePaths,expiresIn=900})=>{
+    const paths=[...new Set((Array.isArray(storagePaths)?storagePaths:[]).map(String).filter(Boolean))];
+    if(!paths.length)return [];
+    if(typeof transport.createSignedUrls==='function')return transport.createSignedUrls(BUCKET,paths,boundedExpiry(expiresIn));
+    return Promise.all(paths.map(async path=>({path,signedUrl:await transport.createSignedUrl(BUCKET,path,boundedExpiry(expiresIn))})));
+  };
 
-  return {source:src,bucket:BUCKET,reserve,finalize,uploadPhoto,update,archive,restore,signedUrl,buildPath:buildJournalMediaPath};
+  return {source:src,bucket:BUCKET,reserve,finalize,uploadPhoto,update,archive,restore,signedUrl,signedUrls,buildPath:buildJournalMediaPath};
 }
