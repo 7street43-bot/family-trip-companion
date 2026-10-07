@@ -12,6 +12,8 @@ on:
       - 'public/sw.js'
       - 'netlify/functions/journal-gpt.mjs'
       - 'tests/journal-j1f-ui.test.mjs'
+      - 'tests/journal-gpt-gateway.test.mjs'
+      - 'tests/journal-mcp-contract.test.mjs'
       - 'docs/JOURNAL_GPT_CONNECTOR.md'
       - '.github/workflows/journal-j1f-entry.yml'
   workflow_dispatch:
