@@ -27,8 +27,8 @@ function json(body, status=200) {
 }
 
 function getGatewayConfig(env=process.env) {
-  const url=String(env.SUPABASE_URL||DEFAULT_URL).trim().replace(/\/$/,'');
-  const publishableKey=String(env.SUPABASE_PUBLISHABLE_KEY||DEFAULT_PUBLISHABLE_KEY).trim();
+  const url=String(env.JOURNAL_SUPABASE_URL||DEFAULT_URL).trim().replace(/\/$/,'');
+  const publishableKey=String(env.JOURNAL_SUPABASE_PUBLISHABLE_KEY||DEFAULT_PUBLISHABLE_KEY).trim();
   if(!/^https:\/\/.+\.supabase\.co$/i.test(url)||!/^sb_publishable_/i.test(publishableKey)) throw new Error('journal_gateway_not_configured');
   return {url,publishableKey};
 }
