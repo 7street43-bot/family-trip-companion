@@ -1,7 +1,7 @@
 import { handleJournalGpt } from './journal-gpt.mjs';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://edjnwbticmkajwdqbgjz.supabase.co').replace(/\/$/, '');
-const PUBLISHABLE_KEY = String(process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j');
+const SUPABASE_URL = String(process.env.JOURNAL_SUPABASE_URL || 'https://edjnwbticmkajwdqbgjz.supabase.co').replace(/\/$/, '');
+const PUBLISHABLE_KEY = String(process.env.JOURNAL_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j');
 const PROTOCOL_VERSION = '2025-06-18';
 const SERVER_INFO = { name:'family-trip-journal', version:'1.0.0' };
 
