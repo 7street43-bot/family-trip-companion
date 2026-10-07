@@ -5,7 +5,7 @@ import { yearlySourceSnapshot } from './journal-yearly.mjs';
 
 const PHOTO_PAGE_SIZE=8;
 const MAX_TRIP_MEDIA=120;
-const state={open:false,loading:false,error:'',model:null,groups:[],visiblePhotos:0,signed:new Map(),mode:'memory'};
+const state={open:false,loading:false,error:'',model:null,groups:[],visiblePhotos:0,signed:new Map(),mode:'memory',souvenir:false};
 
 function clean(v=''){return String(v??'').normalize('NFKC').trim().replace(/\s+/g,' ');}
 function dateOnly(v=''){const s=String(v||'');return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):'';}
