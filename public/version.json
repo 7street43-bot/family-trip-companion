@@ -1,7 +1,7 @@
 {
-  "version": "4.5.0-phase1.13-journal.1",
-  "cache": "twin-trip-v4.5.0-phase1.13-journal.1",
+  "version": "4.5.0-phase1.13-journal.2",
+  "cache": "twin-trip-v4.5.0-phase1.13-journal.2",
   "builtAt": "2026-10-07",
   "channel": "JOURNAL",
-  "previewFeature": "yearly-photo-recap+lazy-media+dedicated-journal-config"
+  "previewFeature": "yearly-photo-recap+dynamic-lazy-media+dedicated-journal-config"
 }
