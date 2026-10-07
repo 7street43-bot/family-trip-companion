@@ -59,7 +59,7 @@ function activateLazyImages(){
   state.observer?.disconnect?.();state.observer=null;
   const imgs=[...(section()?.querySelectorAll('img[data-year-photo-src]')||[])];
   if(!imgs.length)return;
-  const load=img=>{if(!img.src)img.src=img.dataset.yearPhotoSrc||'';delete img.dataset.yearPhotoSrc;};
+  const load=img=>{if(!img.getAttribute('src'))img.setAttribute('src',img.dataset.yearPhotoSrc||'');delete img.dataset.yearPhotoSrc;};
   if(!('IntersectionObserver' in globalThis)){imgs.forEach(load);return;}
   state.observer=new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){load(e.target);state.observer?.unobserve(e.target);}}},{rootMargin:'240px 0px'});
   imgs.forEach(img=>state.observer.observe(img));
