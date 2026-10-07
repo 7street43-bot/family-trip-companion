@@ -1,18 +1,21 @@
 import { createJournalClient, JournalClientError, normalizeJournalError } from '../../shared/journal-client.mjs';
+import { createJournalMediaClient } from '../../shared/journal-media-client.mjs';
 
 const DEFAULT_URL = 'https://edjnwbticmkajwdqbgjz.supabase.co';
 const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j';
-const RPCS = new Set(['journal_create','journal_update','journal_archive','journal_block_mutate']);
+const RPCS = new Set(['journal_create','journal_update','journal_archive','journal_block_mutate','journal_media_mutate']);
 const TABLES = new Set(['journal_entries','journal_blocks','journal_media','journal_revisions']);
 const FILTER_OPS = new Set(['eq','is','gte','lte']);
 const COMMANDS = new Set([
   'createEntry','updateEntry','archiveEntry','restoreEntry',
   'createBlock','updateBlock','reorderBlock','deleteBlock','restoreBlock',
+  'reserveMedia','finalizeMedia','updateMedia','archiveMedia','restoreMedia',
   'listEntries','getEntry'
 ]);
 const MUTATING = new Set([
   'createEntry','updateEntry','archiveEntry','restoreEntry',
-  'createBlock','updateBlock','reorderBlock','deleteBlock','restoreBlock'
+  'createBlock','updateBlock','reorderBlock','deleteBlock','restoreBlock',
+  'reserveMedia','finalizeMedia','updateMedia','archiveMedia','restoreMedia'
 ]);
 
 function json(body, status=200) {
@@ -111,6 +114,17 @@ function createRestJournalTransport({fetchImpl,baseUrl,publishableKey,token}) {
   return Object.freeze({rpc,query});
 }
 
+function createRestJournalMediaTransport({fetchImpl,baseUrl,publishableKey,token}) {
+  return Object.freeze({
+    async rpc(name,args){
+      if(name!=='journal_media_mutate') throw new Error('journal media rpc not allowed');
+      return rpcFetch({fetchImpl,baseUrl,publishableKey,token,name,args});
+    },
+    async upload(){ throw new JournalClientError('GPT gateway cannot upload binary media', {code:'journal_media_binary_upload_not_supported',category:'validation'}); },
+    async createSignedUrl(){ throw new JournalClientError('GPT gateway does not issue media URLs', {code:'journal_media_signed_url_not_supported',category:'validation'}); }
+  });
+}
+
 function uuidLike(s){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s||''));}
 async function deterministicMutationId(userId,command,key){
   const data=new TextEncoder().encode(`${userId}:${command}:${key}`);
@@ -136,7 +150,7 @@ async function ensureWorkspace({fetchImpl,baseUrl,publishableKey,token,body}){
   return id;
 }
 
-async function executeCommand(client,command,body,mutationId){
+async function executeCommand(client,mediaClient,workspaceId,command,body,mutationId){
   switch(command){
     case 'createEntry': return client.createEntry(body.input||{}, {mutationId});
     case 'updateEntry': return client.updateEntry(body.entryId,body.expectedVersion,body.patch||{}, {mutationId});
@@ -147,6 +161,24 @@ async function executeCommand(client,command,body,mutationId){
     case 'reorderBlock': return client.reorderBlock(body.entryId,body.input||{}, {mutationId});
     case 'deleteBlock': return client.deleteBlock(body.entryId,body.input||{}, {mutationId});
     case 'restoreBlock': return client.restoreBlock(body.entryId,body.input||{}, {mutationId});
+    case 'reserveMedia': return mediaClient.reserve({
+      workspaceId,entryId:body.entryId,mediaId:body.mediaId||mutationId,mutationId,
+      mimeType:body.mimeType,width:body.width??null,height:body.height??null,
+      caption:body.caption??null,takenAt:body.takenAt??null,sortOrder:body.sortOrder??1000
+    });
+    case 'finalizeMedia': return mediaClient.finalize({
+      workspaceId,entryId:body.entryId,mediaId:body.mediaId,expectedVersion:body.expectedVersion,mutationId
+    });
+    case 'updateMedia': return mediaClient.update({
+      workspaceId,entryId:body.entryId,mediaId:body.mediaId,expectedVersion:body.expectedVersion,
+      patch:body.patch||{},mutationId
+    });
+    case 'archiveMedia': return mediaClient.archive({
+      workspaceId,entryId:body.entryId,mediaId:body.mediaId,expectedVersion:body.expectedVersion,mutationId
+    });
+    case 'restoreMedia': return mediaClient.restore({
+      workspaceId,entryId:body.entryId,mediaId:body.mediaId,expectedVersion:body.expectedVersion,mutationId
+    });
     case 'listEntries': return client.listEntries(body.options||{});
     case 'getEntry': return client.getEntry(body.entryId,body.options||{});
     default: throw new JournalClientError('Unsupported Journal command',{code:'journal_command_invalid',category:'validation'});
@@ -179,7 +211,11 @@ export async function handleJournalGpt(req,{fetchImpl=globalThis.fetch?.bind(glo
       transport:createRestJournalTransport({fetchImpl,baseUrl,publishableKey,token}),
       workspaceProvider:async()=>workspaceId
     });
-    const result=await executeCommand(client,command,body,mutationId);
+    const mediaClient=createJournalMediaClient({
+      source:'gpt',
+      transport:createRestJournalMediaTransport({fetchImpl,baseUrl,publishableKey,token})
+    });
+    const result=await executeCommand(client,mediaClient,workspaceId,command,body,mutationId);
     return json({ok:true,command,result});
   }catch(err){
     const e=normalizeJournalError(err);
@@ -189,4 +225,4 @@ export async function handleJournalGpt(req,{fetchImpl=globalThis.fetch?.bind(glo
 
 export default async req=>handleJournalGpt(req);
 export const config={path:'/api/journal-gpt',rateLimit:{windowLimit:60,windowSize:60,aggregateBy:['ip','domain']}};
-export const __test={bearer,deterministicMutationId,createRestJournalTransport,executeCommand,handleJournalGpt};
+export const __test={bearer,deterministicMutationId,createRestJournalTransport,createRestJournalMediaTransport,executeCommand,handleJournalGpt};
