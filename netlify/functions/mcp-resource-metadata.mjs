@@ -1,4 +1,4 @@
-const AUTH_SERVER = String(process.env.SUPABASE_URL || 'https://iaecgwitsxghsovdkotw.supabase.co').replace(/\/$/,'') + '/auth/v1';
+const AUTH_SERVER = String(process.env.SUPABASE_URL || 'https://edjnwbticmkajwdqbgjz.supabase.co').replace(/\/$/,'') + '/auth/v1';
 
 export default async function handler(req) {
   if (req.method !== 'GET') {
