@@ -19,6 +19,16 @@ const MAX_SOUVENIR_BYTES=25*1024*1024;
 function safeFileName(v='旅程回憶'){return clean(v).replace(/[\\/:*?\"<>|]+/g,'-').replace(/\s+/g,'_').slice(0,80)||'旅程回憶';}
 export function buildTripShareText(model={}){const lines=[clean(model.title)||'旅程回憶'];if(model.date)lines.push(String(model.date));if(Array.isArray(model.stops)&&model.stops.length)lines.push('景點：'+model.stops.map(x=>clean(x.title)).filter(Boolean).join(' → '));if(Number(model.totalMinutes)>0)lines.push('整趟：約 '+fmtMinutes(model.totalMinutes));if(Number(model.roadDistanceMeters)>0)lines.push('道路：約 '+fmtDistance(model.roadDistanceMeters));const summaries=(Array.isArray(model.journals)?model.journals:[]).map(x=>clean(x.summary)).filter(Boolean).slice(0,3);if(summaries.length)lines.push('回憶：'+summaries.join('｜'));return lines.join('\n');}
 
+function souvenirRouteHtml(model={}){
+  const stops=Array.isArray(model.stops)?model.stops:[];
+  if(!stops.length)return '<section><h2>旅程路線</h2><p class="muted">這趟沒有保存行程路線。</p></section>';
+  const rows=[];
+  if(model.origin?.label||model.origin?.address)rows.push('<div class="route-point fixed"><span>出發</span><div><b>'+esc(model.origin?.label||'出發地')+'</b><small>'+esc(model.origin?.address||'')+'</small></div></div>');
+  stops.forEach((stop,i)=>rows.push('<div class="route-point"><span>'+(i+1)+'</span><div><b>'+esc(stop.title||('地點 '+(i+1)))+'</b>'+(stop.plannedTime?'<small>'+esc(stop.plannedTime)+' 到達'+(stop.durationMinutes?'・停留 '+esc(fmtMinutes(stop.durationMinutes)):'')+'</small>':'')+(stop.address?'<small>'+esc(stop.address)+'</small>':'')+'</div></div>'));
+  if(model.destination?.label||model.returnTime)rows.push('<div class="route-point fixed"><span>終點</span><div><b>'+esc(model.destination?.label||'回程')+'</b><small>'+(model.returnTime?'預計 '+esc(model.returnTime)+' 抵達':'')+'</small></div></div>');
+  return '<section><h2>旅程路線</h2><div class="route">'+rows.join('')+'</div></section>';
+}
+
 export function buildTripMemoryGroups(entries=[]){
   const map=new Map();
   for(const e of Array.isArray(entries)?entries:[]){
