@@ -82,7 +82,7 @@ async function loadMore(){
   finally{state.loadingMore=false;render();}
 }
 
-async function loadAlbum(){
+export async function loadYearAlbum(){
   const snap=yearlySourceSnapshot(),year=Number(snap.year),entries=Array.isArray(snap.entries)?snap.entries:[];
   state.year=year;state.album=[];state.signed.clear();state.visibleCount=0;state.error='';state.loading=true;render();
   try{
@@ -101,9 +101,8 @@ async function loadAlbum(){
 
 function mount(){
   document.addEventListener('click',ev=>{
-    const t=ev.target.closest?.('[data-year-photo-load],[data-year-photo-more]');if(!t)return;
-    if(t.matches('[data-year-photo-load]'))loadAlbum().catch(()=>{});
-    else loadMore().catch(()=>{});
+    const t=ev.target.closest?.('[data-year-photo-more]');if(!t)return;
+    loadMore().catch(()=>{});
   });
 }
 
