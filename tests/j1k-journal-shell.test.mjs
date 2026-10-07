@@ -31,9 +31,16 @@ test('Journal shell state changes are explicit and idempotent',async()=>{
 });
 
 test('Journal shell commands have one explicit owner',async()=>{
-  let opened=0,closed=0;
-  shell.registerCommands({open:()=>{opened++;shell.setOpen(true);return true;},close:()=>{closed++;shell.setOpen(false);return true;}});
+  let opened=0,closed=0,selected='';
+  shell.registerCommands({
+    open:()=>{opened++;shell.setOpen(true);return true;},
+    close:()=>{closed++;shell.setOpen(false);return true;},
+    openEntry:id=>{selected=id;shell.setOpen(true);shell.setSelectedEntryId(id);return true;}
+  });
   assert.equal(await shell.open(),true);
+  assert.equal(await shell.openEntry('entry-map-1'),true);
+  assert.equal(selected,'entry-map-1');
+  assert.equal(shell.snapshot().selectedEntryId,'entry-map-1');
   assert.equal(await shell.close(),true);
   assert.equal(opened,1);
   assert.equal(closed,1);
