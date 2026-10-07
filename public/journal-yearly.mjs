@@ -3,7 +3,7 @@ import journalShell from './journal-shell.mjs';
 import { extractPlaces, visibleTags, entryLabel } from './journal-ui.mjs';
 
 const MAX_YEAR_ENTRIES=500;
-const state={year:new Date().getFullYear(),report:null,loading:false,error:'',mounted:false};
+const state={year:new Date().getFullYear(),report:null,sourceEntries:[],loading:false,error:'',mounted:false};
 
 function uniq(items=[]){return [...new Set(items.filter(Boolean))];}
 function countBy(items=[]){const m=new Map();for(const raw of items){const key=String(raw||'').trim();if(key)m.set(key,(m.get(key)||0)+1);}return [...m.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-TW')).map(([name,count])=>({name,count}));}
@@ -89,7 +89,7 @@ function reportHtml(){
   if(!r.entryCount)return `<div class="journal-year-empty">${r.year} 年目前沒有可回顧的日誌。</div>`;
   const placeChips=r.topPlaces.slice(0,8).map(x=>`<span>${esc(x.name)} <b>${x.count}</b></span>`).join('');
   const monthRows=r.months.map(x=>`<div><span>${esc(x.name.replace('-',' 年 '))} 月</span><b>${x.count} 篇</b></div>`).join('');
-  return `<div class="journal-year-stats"><div><b>${r.outingDays}</b><span>出遊紀錄日</span></div><div><b>${r.entryCount}</b><span>日誌</span></div><div><b>${r.placeCount}</b><span>足跡地點</span></div><div><b>${r.activeMonths}</b><span>有紀錄月份</span></div></div>${placeChips?`<div class="journal-year-places"><strong>常去足跡</strong><div>${placeChips}</div></div>`:''}${monthRows?`<div class="journal-year-months"><strong>月份軌跡</strong>${monthRows}</div>`:''}${r.truncated?'<div class="journal-year-error">年度資料達 500 篇上限，匯出可能不完整。</div>':''}<div class="journal-year-actions"><button type="button" class="journal-secondary" data-year-export="md">下載 Markdown</button><button type="button" class="journal-secondary" data-year-export="json">下載 JSON</button></div><small class="journal-year-note">這一版匯出文字日誌、地點、人物與標籤；照片仍留在私人家庭相簿，不打包下載。</small>`;
+  return `<div class="journal-year-stats"><div><b>${r.outingDays}</b><span>出遊紀錄日</span></div><div><b>${r.entryCount}</b><span>日誌</span></div><div><b>${r.placeCount}</b><span>足跡地點</span></div><div><b>${r.activeMonths}</b><span>有紀錄月份</span></div></div>${placeChips?`<div class="journal-year-places"><strong>常去足跡</strong><div>${placeChips}</div></div>`:''}${monthRows?`<div class="journal-year-months"><strong>月份軌跡</strong>${monthRows}</div>`:''}${r.truncated?'<div class="journal-year-error">年度資料達 500 篇上限，匯出可能不完整。</div>':''}<div class="journal-year-actions"><button type="button" class="journal-secondary" data-year-export="md">下載 Markdown</button><button type="button" class="journal-secondary" data-year-export="json">下載 JSON</button><button type="button" class="journal-secondary" data-year-photo-load>開啟年度相簿</button></div><small class="journal-year-note">文字回顧可下載；年度相簿按下後才讀取照片，平常不載入全年圖片。</small><section id="journalYearlyPhotos" class="journal-year-photos"></section>`;
 }
 function render(){
   const el=panel();if(!el)return;
@@ -106,14 +106,14 @@ async function generate(){
   const input=panel()?.querySelector('[data-year-input]');
   const y=Number(input?.value||state.year);
   if(!Number.isInteger(y)||y<2000||y>2100){state.error='年份需介於 2000–2100。';return render();}
-  state.year=y;state.loading=true;state.error='';state.report=null;render();
+  state.year=y;state.loading=true;state.error='';state.report=null;state.sourceEntries=[];render();
   try{
     await journalBinding.init();
     const status=await journalBinding.getStatus();
     if(!status?.originMatch)throw new Error('Preview 僅驗收年度回顧介面；正式站登入後才讀取家庭日誌。');
     if(!status?.authenticated)throw new Error('請先登入家庭雲端，再產生年度回顧。');
     const rows=await journalBinding.listEntries({from:`${y}-01-01`,to:`${y}-12-31`,includeArchived:false,limit:MAX_YEAR_ENTRIES});
-    state.report=buildYearSummary(rows,y);
+    state.sourceEntries=Array.isArray(rows)?rows:[];state.report=buildYearSummary(rows,y);
   }catch(err){state.error=String(err?.message||err||'年度回顧產生失敗。');}
   finally{state.loading=false;render();}
 }
@@ -138,4 +138,6 @@ function mount(){
   document.addEventListener('change',ev=>{const t=ev.target.closest?.('[data-year-input]');if(t){const y=Number(t.value);if(Number.isInteger(y))state.year=y;}});
   ensurePanel({...journalShell.snapshot(),tab:journalShell.snapshot().tab});
 }
+export function yearlySourceSnapshot(){return {year:state.year,report:state.report,entries:[...state.sourceEntries]};}
+if(typeof window!=='undefined')window.TwinJournalYearly=Object.freeze({snapshot:yearlySourceSnapshot});
 if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
