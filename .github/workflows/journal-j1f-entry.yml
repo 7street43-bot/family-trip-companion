@@ -35,6 +35,8 @@ jobs:
           node --check netlify/functions/journal-gpt.mjs
           node --check public/sw.js
           node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-gpt-gateway.test.mjs
+          node --test tests/journal-mcp-contract.test.mjs
       - name: J1F interface invariants
         run: |
           set -euo pipefail
@@ -51,6 +53,9 @@ jobs:
           grep -Fq '@place:' public/journal-ui.mjs
           grep -Fq 'searchEntriesLocal' public/journal-ui.mjs
           grep -Fq "source:'gpt'" netlify/functions/journal-gpt.mjs
+          grep -Fq "journal_reserve_media" netlify/functions/journal-mcp.mjs
+          grep -Fq "journal_finalize_media" netlify/functions/journal-mcp.mjs
+          grep -Fq "journal_media_mutate" netlify/functions/journal-gpt.mjs
           ! grep -R "SERVICE_ROLE\|service_role" -n public/journal-ui.mjs public/journal-browser.mjs netlify/functions/journal-gpt.mjs
           node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(!/^4\\.5\\.0-phase1\\./.test(v.version)) process.exit(1)"
       - name: Result
