@@ -182,3 +182,9 @@ async function loadAndShow(opts){state.mode='memory';state.loading=true;state.er
 export async function openTripMemory(opts={}){state.open=true;state.error='';state.model=null;state.signed.clear();state.visiblePhotos=0;document?.body?.classList?.add('trip-memory-open');if(opts?.entryId||opts?.groupKey)return loadAndShow(opts);const snap=yearlySourceSnapshot();state.groups=buildTripMemoryGroups(snap.entries);state.mode='select';state.loading=false;render();}
 
 function closeTripMemory(){state.open=false;state.model=null;state.groups=[];state.signed.clear();state.error='';state.loading=false;render();document?.body?.classList?.remove('trip-memory-open');}
+
+function mount(){document.addEventListener('click',ev=>{const t=ev.target.closest?.('[data-trip-memory-close],[data-trip-memory-group],[data-trip-memory-more],[data-trip-memory-entry]');if(!t)return;if(t.matches('[data-trip-memory-close]'))return closeTripMemory();if(t.dataset.tripMemoryGroup)return loadAndShow({groupKey:t.dataset.tripMemoryGroup});if(t.matches('[data-trip-memory-more]'))return revealNextPhotos().catch(err=>{state.error=String(err?.message||err);render();});if(t.dataset.tripMemoryEntry){const id=t.dataset.tripMemoryEntry;closeTripMemory();return journalShell.openEntry(id).catch(()=>{});}});document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&state.open)closeTripMemory();});}
+
+if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
+
+export const __test={PHOTO_PAGE_SIZE,MAX_TRIP_MEDIA,fmtMinutes,fmtDistance};
