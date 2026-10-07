@@ -168,3 +168,5 @@ function selectorHtml(){
 }
 
 function metricsHtml(m){const items=[[m.stops.length,'景點'],[m.journals.length,'日誌'],[m.photos.length,'照片'],[m.roadMinutes?fmtMinutes(m.roadMinutes):'—','道路移動']];return '<div class="trip-memory-metrics">'+items.map(x=>'<div><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>').join('')+'</div>';}
+
+function memoryHtml(m){return '<section class="trip-memory-card"><div class="trip-memory-head"><h2>'+esc(m.title)+'</h2><button type="button" data-trip-memory-close>關閉</button></div>'+metricsHtml(m)+'<h3>旅程路線</h3>'+routeHtml(m)+'<h3>照片回憶</h3>'+photoHtml(m)+'<h3>當天日誌</h3>'+journalHtml(m)+'</section>';}
