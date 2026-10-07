@@ -29,7 +29,7 @@ test('known location index reuses entity and itinerary coordinates',()=>{
 test('resolution prefers known coordinates and then fresh cache',()=>{
   const places=buildFootprintPlaces(entries);
   const known=new Map([['南寮',{name:'南寮',latitude:24.85,longitude:120.92,source:'entity'}]]);
-  const cache={'新竹動物園':null,'新竹動物園'.toLocaleLowerCase('zh-TW'):{savedAt:Date.now(),location:{name:'新竹動物園',latitude:24.80,longitude:120.98,source:'cache'}}};
+  const cache={['新竹動物園'.toLocaleLowerCase('zh-TW')]:{savedAt:Date.now(),location:{name:'新竹動物園',latitude:24.80,longitude:120.98,source:'cache'}}};
   const r=mergeFootprintResolution(places,known,cache);
   assert.equal(r.resolved.length,2);
   assert.equal(r.unresolved.length,0);
