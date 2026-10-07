@@ -1,7 +1,7 @@
 import { handleJournalGpt } from './journal-gpt.mjs';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://iaecgwitsxghsovdkotw.supabase.co').replace(/\/$/, '');
-const PUBLISHABLE_KEY = String(process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_6der9Hrl7J1KLrrzuXCdKQ_yl-IpYRe');
+const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://edjnwbticmkajwdqbgjz.supabase.co').replace(/\/$/, '');
+const PUBLISHABLE_KEY = String(process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j');
 const PROTOCOL_VERSION = '2025-06-18';
 const SERVER_INFO = { name:'family-trip-journal', version:'1.0.0' };
 
@@ -144,6 +144,45 @@ const tools = [
       },required:['expectedVersion'],additionalProperties:false}
     }, required:['workspaceId','entryId','operation','block'], additionalProperties:false },
     annotations:{ readOnlyHint:false, destructiveHint:true, idempotentHint:false, openWorldHint:false }
+  },
+  {
+    name:'journal_reserve_media',
+    description:'為日誌照片預約私有媒體 metadata 與安全 Storage path。此工具不直接上傳圖片二進位。',
+    inputSchema:{ type:'object', properties:{
+      workspaceId:{type:'string'}, entryId:{type:'string'}, mediaId:{type:['string','null']},
+      mimeType:{type:'string',enum:['image/jpeg','image/png','image/webp','image/heic','image/heif']},
+      width:{type:['integer','null'],minimum:1}, height:{type:['integer','null'],minimum:1},
+      caption:{type:['string','null']}, takenAt:{type:['string','null']}, sortOrder:{type:'integer',minimum:0,default:1000}
+    }, required:['workspaceId','entryId','mimeType'], additionalProperties:false },
+    annotations:{ readOnlyHint:false, destructiveHint:false, idempotentHint:false, openWorldHint:false }
+  },
+  {
+    name:'journal_finalize_media',
+    description:'在 App/客戶端完成私有圖片上傳後，將已預約媒體標記為 ready。',
+    inputSchema:{ type:'object', properties:{
+      workspaceId:{type:'string'}, entryId:{type:'string'}, mediaId:{type:'string'}, expectedVersion:{type:'integer',minimum:1}
+    }, required:['workspaceId','entryId','mediaId','expectedVersion'], additionalProperties:false },
+    annotations:{ readOnlyHint:false, destructiveHint:false, idempotentHint:false, openWorldHint:false }
+  },
+  {
+    name:'journal_update_media',
+    description:'以樂觀鎖版本更新照片 caption、尺寸、拍攝時間或排序。',
+    inputSchema:{ type:'object', properties:{
+      workspaceId:{type:'string'}, entryId:{type:'string'}, mediaId:{type:'string'}, expectedVersion:{type:'integer',minimum:1},
+      patch:{type:'object',properties:{
+        width:{type:['integer','null'],minimum:1}, height:{type:['integer','null'],minimum:1},
+        caption:{type:['string','null']}, takenAt:{type:['string','null']}, sortOrder:{type:'integer',minimum:0}
+      },additionalProperties:false}
+    }, required:['workspaceId','entryId','mediaId','expectedVersion','patch'], additionalProperties:false },
+    annotations:{ readOnlyHint:false, destructiveHint:false, idempotentHint:false, openWorldHint:false }
+  },
+  {
+    name:'journal_set_media_archived',
+    description:'封存或還原一張日誌照片 metadata；不直接刪除私有 Storage 物件。',
+    inputSchema:{ type:'object', properties:{
+      workspaceId:{type:'string'}, entryId:{type:'string'}, mediaId:{type:'string'}, expectedVersion:{type:'integer',minimum:1}, archived:{type:'boolean'}
+    }, required:['workspaceId','entryId','mediaId','expectedVersion','archived'], additionalProperties:false },
+    annotations:{ readOnlyHint:false, destructiveHint:true, idempotentHint:false, openWorldHint:false }
   }
 ];
 
@@ -163,6 +202,16 @@ function mapTool(name, args={}) {
       const command = ({ create:'createBlock', update:'updateBlock', reorder:'reorderBlock', delete:'deleteBlock', restore:'restoreBlock' })[args.operation];
       return { command, workspaceId:args.workspaceId, entryId:args.entryId, input:args.block || {} };
     }
+    case 'journal_reserve_media':
+      return { command:'reserveMedia', workspaceId:args.workspaceId, entryId:args.entryId, mediaId:args.mediaId??null,
+        mimeType:args.mimeType, width:args.width??null, height:args.height??null, caption:args.caption??null,
+        takenAt:args.takenAt??null, sortOrder:args.sortOrder??1000 };
+    case 'journal_finalize_media':
+      return { command:'finalizeMedia', workspaceId:args.workspaceId, entryId:args.entryId, mediaId:args.mediaId, expectedVersion:args.expectedVersion };
+    case 'journal_update_media':
+      return { command:'updateMedia', workspaceId:args.workspaceId, entryId:args.entryId, mediaId:args.mediaId, expectedVersion:args.expectedVersion, patch:args.patch||{} };
+    case 'journal_set_media_archived':
+      return { command:args.archived?'archiveMedia':'restoreMedia', workspaceId:args.workspaceId, entryId:args.entryId, mediaId:args.mediaId, expectedVersion:args.expectedVersion };
     default: return null;
   }
 }
