@@ -1,0 +1,17 @@
+const DEFAULT_URL = 'https://edjnwbticmkajwdqbgjz.supabase.co';
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j';
+const DEFAULT_SITE_ORIGIN = 'https://comfy-heliotrope-475c71.netlify.app';
+
+export default async () => {
+  const url = String(process.env.JOURNAL_SUPABASE_URL || DEFAULT_URL).trim();
+  const publishableKey = String(process.env.JOURNAL_SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY).trim();
+  const siteOrigin = String(process.env.APP_SITE_URL || DEFAULT_SITE_ORIGIN).trim().replace(/\/$/, '');
+  const siteOriginValid = /^https:\/\/[^/]+$/i.test(siteOrigin);
+  const configured = /^https:\/\/.+\.supabase\.co$/i.test(url) && /^sb_publishable_/i.test(publishableKey);
+  return Response.json(
+    { configured, url:configured?url:'', publishableKey:configured?publishableKey:'', siteOrigin:siteOriginValid?siteOrigin:'' },
+    { headers:{'cache-control':'no-store','x-content-type-options':'nosniff'} }
+  );
+};
+
+export const config = { path:'/api/journal-config' };
