@@ -35,7 +35,7 @@ function fakeFetch({authOk=true,onRpc=()=>{},journalResponse={status:'applied',t
   };
 }
 
-const env={SUPABASE_URL:BASE,SUPABASE_PUBLISHABLE_KEY:KEY};
+const env={JOURNAL_SUPABASE_URL:BASE,JOURNAL_SUPABASE_PUBLISHABLE_KEY:KEY};
 
 test('missing bearer token is rejected before upstream calls',async()=>{
   let called=0;
