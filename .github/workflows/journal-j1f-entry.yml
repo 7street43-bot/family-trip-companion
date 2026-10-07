@@ -5,6 +5,7 @@ on:
     branches: [preview]
     paths:
       - 'public/journal-ui.mjs'
+      - 'public/journal-yearly.mjs'
       - 'public/journal.css'
       - 'public/journal-browser.mjs'
       - 'public/index.html'
@@ -12,6 +13,7 @@ on:
       - 'public/sw.js'
       - 'netlify/functions/journal-gpt.mjs'
       - 'tests/journal-j1f-ui.test.mjs'
+      - 'tests/journal-yearly.test.mjs'
       - 'tests/journal-gpt-gateway.test.mjs'
       - 'tests/journal-mcp-contract.test.mjs'
       - 'docs/JOURNAL_GPT_CONNECTOR.md'
@@ -33,16 +35,22 @@ jobs:
         run: |
           set -euo pipefail
           node --check public/journal-ui.mjs
+          node --check public/journal-yearly.mjs
           node --check public/journal-browser.mjs
           node --check netlify/functions/journal-gpt.mjs
           node --check public/sw.js
           node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-yearly.test.mjs
           node --test tests/journal-gpt-gateway.test.mjs
           node --test tests/journal-mcp-contract.test.mjs
       - name: J1F interface invariants
         run: |
           set -euo pipefail
           grep -Fq 'journal-ui.mjs' public/index.html
+          grep -Fq 'journal-yearly.mjs' public/index.html
+          grep -Fq '年度旅遊回顧' public/journal-yearly.mjs
+          grep -Fq '下載 Markdown' public/journal-yearly.mjs
+          grep -Fq 'MAX_YEAR_ENTRIES=500' public/journal-yearly.mjs
           grep -Fq 'journal.css' public/index.html
           grep -Fq "QUEUE_KEY='journalJ1FQueue'" public/journal-ui.mjs
           grep -Fq 'Preview 安全模式不會寫入或排入正式日誌' public/journal-ui.mjs
@@ -88,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /journal-ui.mjs /journal.css /journal-browser.mjs /lib/journal-client.mjs /lib/journal-supabase-transport.mjs; do
+          for p in /journal-ui.mjs /journal-yearly.mjs /journal.css /journal-browser.mjs /lib/journal-client.mjs /lib/journal-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1f=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
@@ -100,6 +108,9 @@ jobs:
           grep -Fq '歷史' /tmp/journal-ui.mjs
           grep -Fq '搜尋' /tmp/journal-ui.mjs
           grep -Fq '查看已收起' /tmp/journal-ui.mjs
+          curl --fail --silent --show-error --location "$base/journal-yearly.mjs?j1f=$GITHUB_SHA" -o /tmp/journal-yearly.mjs
+          grep -Fq '年度旅遊回顧' /tmp/journal-yearly.mjs
+          grep -Fq '下載 Markdown' /tmp/journal-yearly.mjs
       - name: GPT gateway fail-closed smoke
         shell: bash
         run: |
