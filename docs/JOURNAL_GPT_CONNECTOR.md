@@ -75,6 +75,15 @@ The Journal code path is Preview-ready on the dedicated Family Trip Companion Su
 - OpenAI MCP / plugin server guidance: https://developers.openai.com/plugins/build/mcp-server
 - OpenAI Developer Mode / MCP availability: https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-apps-in-chatgpt-beta
 
+## Dedicated Supabase runtime config
+
+Journal GPT/MCP uses dedicated runtime keys and must not reuse the App-wide Supabase variables:
+
+- `JOURNAL_SUPABASE_URL`
+- `JOURNAL_SUPABASE_PUBLISHABLE_KEY`
+
+If these are absent, the Journal backend falls back to the dedicated Family Trip Companion project `edjnwbticmkajwdqbgjz`. This prevents the legacy/central-database `SUPABASE_URL` from silently overriding Journal routing.
+
 ## Media contract
 
 GPT can reserve/finalize/update/archive/restore Journal media metadata. It cannot upload image binary through the MCP or `/api/journal-gpt`. The authenticated App/client remains responsible for uploading the actual file to the private `journal-media` bucket, after which GPT may finalize the reserved media record. No service-role credential is exposed.
