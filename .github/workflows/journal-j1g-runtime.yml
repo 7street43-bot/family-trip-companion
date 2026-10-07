@@ -41,6 +41,7 @@ jobs:
           node --check public/journal-ui.mjs
           node --check public/journal-media-ui.mjs
           node --check public/journal-yearly-photos.mjs
+          node --check public/journal-yearly-story.mjs
           node --check netlify/functions/journal-config.mjs
           node --check public/journal-media-preview-demo.mjs
           node --check public/journal-nav-bridge.mjs
@@ -52,6 +53,7 @@ jobs:
           node --test tests/journal-browser-binding.test.mjs
           node --test tests/journal-j1g-media-client.test.mjs
           node --test tests/journal-yearly-photos.test.mjs
+          node --test tests/journal-j1g-yearly-story.test.mjs
           node --test tests/j1k-journal-shell.test.mjs
       - name: Media security and deterministic UI invariants
         run: |
@@ -59,6 +61,12 @@ jobs:
           grep -Fq 'journal-media-ui.mjs' public/index.html
           ! grep -Fq 'journal-yearly-photos.mjs' public/index.html
           grep -Fq "import('./journal-yearly-photos.mjs')" public/journal-yearly.mjs
+          grep -Fq "import('./journal-yearly-story.mjs')" public/journal-yearly.mjs
+          ! grep -Fq 'journal-yearly-story.mjs' public/index.html
+          grep -Fq 'MAX_STORY_MOMENTS=20' public/journal-yearly-story.mjs
+          grep -Fq 'SIGN_WINDOW=3' public/journal-yearly-story.mjs
+          grep -Fq 'AUTO_MS=5000' public/journal-yearly-story.mjs
+          grep -Fq '.journal-story{' public/journal.css
           grep -Fq "'/api/journal-config'" public/journal-browser.mjs
           grep -Fq 'createSignedUrls' shared/journal-media-supabase-transport.mjs
           grep -Fq 'IntersectionObserver' public/journal-yearly-photos.mjs
@@ -115,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /runtime-config.js /update-manager.js /journal-yearly-photos.mjs /api/journal-config /journal-shell.mjs /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-nav-bridge.mjs /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
+          for p in /runtime-config.js /update-manager.js /journal-yearly-photos.mjs /journal-yearly-story.mjs /api/journal-config /journal-shell.mjs /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-nav-bridge.mjs /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1g=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
