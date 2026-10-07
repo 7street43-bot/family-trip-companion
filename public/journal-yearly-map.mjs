@@ -37,12 +37,13 @@ export function buildFootprintPlaces(entries=[]){
 function locationRow(name,row={},source='known'){
   const latitude=finite(row.latitude),longitude=finite(row.longitude);
   if(latitude===null||longitude===null)return null;
+  const rawUrl=clean(row.googleMapsUrl||row.googleMapsUri);
   return {
     name:clean(name||row.name||row.title||row.label),
     latitude,longitude,
     placeId:clean(row.placeId||row.place_id)||null,
     address:clean(row.address||row.formattedAddress)||'',
-    googleMapsUrl:clean(row.googleMapsUrl||row.googleMapsUri)||'',
+    googleMapsUrl:/^https:\/\//i.test(rawUrl)?rawUrl:'',
     source
   };
 }
