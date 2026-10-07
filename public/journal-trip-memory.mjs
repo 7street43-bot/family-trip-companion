@@ -15,6 +15,7 @@ function fmtDistance(v){const n=Math.max(0,Number(v)||0);if(!n)return '';return 
 function entryTitle(e={}){return clean(e.title)||clean(e.summary).slice(0,36)||'旅遊日誌';}
 const MAX_SOUVENIR_PHOTOS=24;
 const SOUVENIR_CONCURRENCY=3;
+const MAX_SOUVENIR_BYTES=25*1024*1024;
 function safeFileName(v='旅程回憶'){return clean(v).replace(/[\\/:*?\"<>|]+/g,'-').replace(/\s+/g,'_').slice(0,80)||'旅程回憶';}
 export function buildTripShareText(model={}){const lines=[clean(model.title)||'旅程回憶'];if(model.date)lines.push(String(model.date));if(Array.isArray(model.stops)&&model.stops.length)lines.push('景點：'+model.stops.map(x=>clean(x.title)).filter(Boolean).join(' → '));if(Number(model.totalMinutes)>0)lines.push('整趟：約 '+fmtMinutes(model.totalMinutes));if(Number(model.roadDistanceMeters)>0)lines.push('道路：約 '+fmtDistance(model.roadDistanceMeters));const summaries=(Array.isArray(model.journals)?model.journals:[]).map(x=>clean(x.summary)).filter(Boolean).slice(0,3);if(summaries.length)lines.push('回憶：'+summaries.join('｜'));return lines.join('\n');}
 
