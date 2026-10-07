@@ -166,3 +166,5 @@ function selectorHtml(){
   if(!state.groups.length)return '<div class="trip-memory-empty">這一年沒有可整理成旅程回憶的日誌。</div>';
   return '<div class="trip-memory-select">'+state.groups.map(g=>'<button type="button" data-trip-memory-group="'+esc(g.key)+'"><span>'+esc(g.date||'日期未設定')+'</span><strong>'+esc(g.title)+'</strong><small>'+g.entryCount+' 篇日誌'+(g.tripRef?'・已連行程':'・日期回憶')+'</small></button>').join('')+'</div>';
 }
+
+function metricsHtml(m){const items=[[m.stops.length,'景點'],[m.journals.length,'日誌'],[m.photos.length,'照片'],[m.roadMinutes?fmtMinutes(m.roadMinutes):'—','道路移動']];return '<div class="trip-memory-metrics">'+items.map(x=>'<div><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>').join('')+'</div>';}
