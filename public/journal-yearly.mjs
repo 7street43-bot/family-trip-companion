@@ -89,7 +89,7 @@ function reportHtml(){
   if(!r.entryCount)return `<div class="journal-year-empty">${r.year} 年目前沒有可回顧的日誌。</div>`;
   const placeChips=r.topPlaces.slice(0,8).map(x=>`<span>${esc(x.name)} <b>${x.count}</b></span>`).join('');
   const monthRows=r.months.map(x=>`<div><span>${esc(x.name.replace('-',' 年 '))} 月</span><b>${x.count} 篇</b></div>`).join('');
-  return `<div class="journal-year-stats"><div><b>${r.outingDays}</b><span>出遊紀錄日</span></div><div><b>${r.entryCount}</b><span>日誌</span></div><div><b>${r.placeCount}</b><span>足跡地點</span></div><div><b>${r.activeMonths}</b><span>有紀錄月份</span></div></div>${placeChips?`<div class="journal-year-places"><strong>常去足跡</strong><div>${placeChips}</div></div>`:''}${monthRows?`<div class="journal-year-months"><strong>月份軌跡</strong>${monthRows}</div>`:''}${r.truncated?'<div class="journal-year-error">年度資料達 500 篇上限，匯出可能不完整。</div>':''}<div class="journal-year-actions"><button type="button" class="journal-secondary" data-year-export="md">下載 Markdown</button><button type="button" class="journal-secondary" data-year-export="json">下載 JSON</button><button type="button" class="journal-secondary" data-year-photo-load>開啟年度相簿</button><button type="button" class="journal-secondary" data-year-story-load>播放年度故事</button><button type="button" class="journal-secondary" data-year-map-load>年度足跡地圖</button></div><small class="journal-year-note">文字回顧可下載；年度相簿按下後才讀取照片，平常不載入全年圖片。</small><section id="journalYearlyPhotos" class="journal-year-photos"></section>`;
+  return `<div class="journal-year-stats"><div><b>${r.outingDays}</b><span>出遊紀錄日</span></div><div><b>${r.entryCount}</b><span>日誌</span></div><div><b>${r.placeCount}</b><span>足跡地點</span></div><div><b>${r.activeMonths}</b><span>有紀錄月份</span></div></div>${placeChips?`<div class="journal-year-places"><strong>常去足跡</strong><div>${placeChips}</div></div>`:''}${monthRows?`<div class="journal-year-months"><strong>月份軌跡</strong>${monthRows}</div>`:''}${r.truncated?'<div class="journal-year-error">年度資料達 500 篇上限，匯出可能不完整。</div>':''}<div class="journal-year-actions"><button type="button" class="journal-secondary" data-year-export="md">下載 Markdown</button><button type="button" class="journal-secondary" data-year-export="json">下載 JSON</button><button type="button" class="journal-secondary" data-year-photo-load>開啟年度相簿</button><button type="button" class="journal-secondary" data-year-story-load>播放年度故事</button><button type="button" class="journal-secondary" data-year-map-load>年度足跡地圖</button><button type="button" class="journal-secondary" data-year-trip-memory>單次旅程回憶</button></div><small class="journal-year-note">文字回顧可下載；年度相簿按下後才讀取照片，平常不載入全年圖片。</small><section id="journalYearlyPhotos" class="journal-year-photos"></section>`;
 }
 function render(){
   const el=panel();if(!el)return;
@@ -131,11 +131,12 @@ function mount(){
   if(state.mounted)return;state.mounted=true;
   journalShell.on('rendered',ensurePanel);
   document.addEventListener('click',ev=>{
-    const t=ev.target.closest?.('[data-year-generate],[data-year-export],[data-year-photo-load],[data-year-story-load],[data-year-map-load]');if(!t)return;
+    const t=ev.target.closest?.('[data-year-generate],[data-year-export],[data-year-photo-load],[data-year-story-load],[data-year-map-load],[data-year-trip-memory]');if(!t)return;
     if(t.matches('[data-year-generate]'))generate().catch(()=>{});
     else if(t.matches('[data-year-photo-load]'))import('./journal-yearly-photos.mjs').then(m=>m.loadYearAlbum()).catch(err=>{state.error=String(err?.message||err||'年度相簿載入失敗。');render();});
     else if(t.matches('[data-year-story-load]'))import('./journal-yearly-story.mjs').then(m=>m.openYearStory()).catch(err=>{state.error=String(err?.message||err||'年度故事載入失敗。');render();});
     else if(t.matches('[data-year-map-load]'))import('./journal-yearly-map.mjs').then(m=>m.openYearFootprintMap()).catch(err=>{state.error=String(err?.message||err||'年度足跡地圖載入失敗。');render();});
+    else if(t.matches('[data-year-trip-memory]'))import('./journal-trip-memory.mjs').then(m=>m.openTripMemory()).catch(err=>{state.error=String(err?.message||err||'旅程回憶載入失敗。');render();});
     else exportReport(t.dataset.yearExport);
   });
   document.addEventListener('change',ev=>{const t=ev.target.closest?.('[data-year-input]');if(t){const y=Number(t.value);if(Number.isInteger(y))state.year=y;}});
