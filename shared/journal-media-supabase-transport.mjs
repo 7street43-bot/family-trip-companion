@@ -26,6 +26,17 @@ export function createSupabaseJournalMediaTransport(supabaseClient){
       if(!data?.signedUrl)throw new Error('signed url missing');
       return data.signedUrl;
     },
+    async createSignedUrls(bucket,paths,expiresIn){
+      const api=fromBucket(bucket);
+      const safePaths=[...new Set((Array.isArray(paths)?paths:[]).map(String).filter(Boolean))];
+      if(!safePaths.length)return [];
+      const {data,error}=await api.createSignedUrls(safePaths,expiresIn);
+      if(error)throw error;
+      return (Array.isArray(data)?data:[]).map((row,index)=>({
+        path:String(row?.path||safePaths[index]||''),
+        signedUrl:String(row?.signedUrl||'')
+      })).filter(row=>row.path&&row.signedUrl);
+    },
     isObjectExistsError(error){
       const status=Number(error?.statusCode||error?.status||0);
       const msg=String(error?.message||'').toLowerCase();
