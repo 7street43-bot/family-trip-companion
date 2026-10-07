@@ -190,6 +190,11 @@ function render(){const el=overlay();if(!el)return;el.hidden=!state.open;if(!sta
 
 async function signPhotoRange(start,end){const m=state.model;if(!m)return;const paths=m.photos.slice(start,end).map(p=>p.storagePath).filter(Boolean).filter(p=>!state.signed.has(p));if(!paths.length)return;const rows=await journalBinding.mediaSignedUrls(paths,900);for(const row of Array.isArray(rows)?rows:[])if(row?.path&&row?.signedUrl)state.signed.set(String(row.path),String(row.signedUrl));}
 
+function toggleTripSouvenirMode(on){
+  document.body.classList.toggle('trip-memory-souvenir',!!on);
+  return !!on;
+}
+
 async function revealNextPhotos(){const m=state.model;if(!m||state.visiblePhotos>=m.photos.length)return;const next=Math.min(m.photos.length,state.visiblePhotos+PHOTO_PAGE_SIZE);await signPhotoRange(state.visiblePhotos,next);state.visiblePhotos=next;render();}
 
 async function loadAndShow(opts){state.mode='memory';state.loading=true;state.error='';state.model=null;state.visiblePhotos=0;state.signed.clear();render();try{state.model=await loadModel(opts);state.loading=false;if(state.model.photos.length)await revealNextPhotos();else render();}catch(err){state.loading=false;state.error=String(err?.message||err||'旅程回憶載入失敗。');render();}}
