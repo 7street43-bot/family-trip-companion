@@ -54,3 +54,42 @@ test('browser binding requires a signed-in session',async()=>{
   await assert.rejects(()=>binding.listEntries(),e=>e?.code==='journal_not_authenticated'&&e?.category==='auth');
   assert.equal(fake.calls.length,0);
 });
+
+
+test('Journal browser loads dedicated journal-config instead of shared cloud-config',async()=>{
+  let requested='';
+  const fetchImpl=async url=>{requested=String(url);return new Response(JSON.stringify({configured:true,url:'https://edjnwbticmkajwdqbgjz.supabase.co',publishableKey:'sb_publishable_test',siteOrigin:'https://prod.example'}),{status:200,headers:{'content-type':'application/json'}});};
+  const fake=fakeSupabase({session:false});
+  const binding=createBrowserJournalBinding({fetchImpl,loadSupabase:async()=>fake.module,env:env('https://prod.example')});
+  await binding.init();
+  assert.equal(requested,'/api/journal-config');
+});
+
+test('year album media query is workspace scoped, chunked and filters only live ready media',async()=>{
+  const calls=[];
+  const query={
+    select(v){calls.push(['select',v]);return this;},
+    eq(k,v){calls.push(['eq',k,v]);return this;},
+    in(k,v){calls.push(['in',k,[...v]]);return this;},
+    is(k,v){calls.push(['is',k,v]);return this;},
+    order(k,v){calls.push(['order',k,v]);return this;},
+    limit(v){calls.push(['limit',v]);return Promise.resolve({data:[{id:'m1',entry_id:'e1',storage_path:'x'}],error:null});}
+  };
+  const client={
+    auth:{getSession:async()=>({data:{session:{user:{id:'u1'}}},error:null})},
+    rpc:async name=>name==='ensure_personal_family_workspace'?{data:WID,error:null}:{data:null,error:null},
+    from:table=>{calls.push(['from',table]);return query;},
+    storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'x'},error:null}),createSignedUrls:async()=>({data:[],error:null})})}
+  };
+  const binding=createBrowserJournalBinding({fetchImpl:configFetch('https://prod.example'),loadSupabase:async()=>({createClient:()=>client}),env:env('https://prod.example')});
+  const ids=Array.from({length:80},(_,i)=>`entry-${i}`);
+  const rows=await binding.listMediaForEntries(ids,{limit:240});
+  assert.equal(rows.length,2);
+  const chunks=calls.filter(x=>x[0]==='in');
+  assert.equal(chunks.length,2);
+  assert.equal(chunks[0][2].length,75);
+  assert.equal(chunks[1][2].length,5);
+  assert.ok(calls.some(x=>x[0]==='eq'&&x[1]==='workspace_id'&&x[2]===WID));
+  assert.ok(calls.some(x=>x[0]==='eq'&&x[1]==='upload_state'&&x[2]==='ready'));
+  assert.ok(calls.some(x=>x[0]==='is'&&x[1]==='deleted_at'&&x[2]===null));
+});
