@@ -74,3 +74,90 @@ export function buildTripMemoryModel({trip=null,entries=[],media=[]}={}){
     photos
   };
 }
+
+async function loadTrip(tripRef,date){
+  if(!globalThis.TwinDB)return null;
+  if(tripRef){
+    const exact=await TwinDB.get('itineraries',tripRef).catch(()=>null);
+    if(exact)return exact;
+  }
+  const rows=await TwinDB.getAll('itineraries').catch(()=>[]);
+  const sameDate=(Array.isArray(rows)?rows:[]).filter(t=>t?.model==='itinerary-v2'&&dateOnly(t?.date)===date);
+  if(!sameDate.length)return null;
+  if(tripRef){
+    const byId=sameDate.find(t=>String(t.id||'')===String(tripRef));
+    if(byId)return byId;
+  }
+  return sameDate[0]||null;
+}
+
+async function loadEntriesFor({entryId=null,groupKey=null}={}){
+  if(entryId){
+    const detail=await journalBinding.getEntry(entryId,{includeRevisions:false});
+    const base=detail?.entry;
+    if(!base)return {entries:[],base:null};
+    const tripRef=clean(base.trip_ref),date=dateOnly(base.entry_date);
+    const entries=tripRef
+      ? await journalBinding.listEntries({tripRef,includeArchived:false,limit:100})
+      : await journalBinding.listEntries({from:date,to:date,includeArchived:false,limit:100});
+    return {entries,base};
+  }
+  const snap=yearlySourceSnapshot(),groups=buildTripMemoryGroups(snap.entries);
+  const group=groups.find(g=>g.key===groupKey);
+  if(!group)return {entries:[],base:null};
+  return {entries:group.entries,base:group.entries[0]||null};
+}
+
+async function loadModel(opts={}){
+  await journalBinding.init();
+  const status=await journalBinding.getStatus();
+  if(!status?.originMatch)throw new Error('Preview 只驗收單次旅程回憶介面；正式站登入後才讀取家庭資料。');
+  if(!status?.authenticated)throw new Error('請先登入家庭雲端，再開啟旅程回憶。');
+  const loaded=await loadEntriesFor(opts);
+  if(!loaded.entries.length)throw new Error('找不到這趟旅程的日誌。');
+  const tripRef=clean(loaded.base?.trip_ref),date=dateOnly(loaded.base?.entry_date);
+  const trip=await loadTrip(tripRef,date);
+  const ids=loaded.entries.map(e=>String(e.id||'')).filter(Boolean);
+  const media=await journalBinding.listMediaForEntries(ids,{limit:MAX_TRIP_MEDIA});
+  return buildTripMemoryModel({trip,entries:loaded.entries,media});
+}
+
+function overlay(){
+  let el=document.getElementById('journalTripMemory');
+  if(!el&&typeof document!=='undefined'){
+    el=document.createElement('div');el.id='journalTripMemory';el.className='journal-trip-memory';el.hidden=true;document.body.appendChild(el);
+  }
+  return el;
+}
+
+function routeHtml(m){
+  if(!m.stops.length)return '<div class="trip-memory-empty">這趟沒有保存行程路線。</div>';
+  const legs=Array.isArray(m.route?.legs)?m.route.legs:[];
+  const rows=[];
+  if(m.origin?.label||m.origin?.address)rows.push('<div class="trip-memory-route-point fixed"><span>出發</span><strong>'+esc(m.origin?.label||'出發地')+'</strong><small>'+esc(m.origin?.address||'')+'</small></div>');
+  m.stops.forEach((stop,i)=>{
+    const leg=legs[i]||null;
+    if(leg)rows.push('<div class="trip-memory-leg">🚗 '+esc(fmtMinutes((Number(leg.durationSeconds)||0)/60))+(leg.distanceMeters?'・'+esc(fmtDistance(leg.distanceMeters)):'')+'</div>');
+    rows.push('<div class="trip-memory-route-point"><span>'+(i+1)+'</span><div><strong>'+esc(stop.title)+'</strong>'+(stop.plannedTime?'<small>'+esc(stop.plannedTime)+' 到達'+(stop.durationMinutes?'・停留 '+esc(fmtMinutes(stop.durationMinutes)):'')+'</small>':'')+(stop.address?'<small>'+esc(stop.address)+'</small>':'')+'</div></div>');
+  });
+  const backLeg=legs[m.stops.length]||null;
+  if(backLeg)rows.push('<div class="trip-memory-leg">🚗 '+esc(fmtMinutes((Number(backLeg.durationSeconds)||0)/60))+(backLeg.distanceMeters?'・'+esc(fmtDistance(backLeg.distanceMeters)):'')+'</div>');
+  if(m.destination?.label||m.returnTime)rows.push('<div class="trip-memory-route-point fixed"><span>終點</span><strong>'+esc(m.destination?.label||'回程')+'</strong><small>'+(m.returnTime?'預計 '+esc(m.returnTime)+' 抵達':'')+'</small></div>');
+  return '<div class="trip-memory-route">'+rows.join('')+'</div>';
+}
+
+function journalHtml(m){
+  if(!m.journals.length)return '<div class="trip-memory-empty">這趟沒有日誌。</div>';
+  return '<div class="trip-memory-journals">'+m.journals.map(j=>'<button type="button" data-trip-memory-entry="'+esc(j.id)+'"><small>'+esc(j.date)+'</small><strong>'+esc(j.title)+'</strong>'+(j.summary?'<p>'+esc(j.summary)+'</p>':'')+'</button>').join('')+'</div>';
+}
+
+function photoHtml(m){
+  if(!m.photos.length)return '<div class="trip-memory-empty">這趟還沒有照片。</div>';
+  const rows=m.photos.slice(0,state.visiblePhotos);
+  const cards=rows.map(p=>{
+    const url=state.signed.get(p.storagePath)||'';
+    return '<figure>'+(url?'<img src="'+esc(url)+'" alt="'+esc(p.caption||m.title)+'" loading="lazy" decoding="async">':'<div class="trip-memory-photo-placeholder">照片準備中</div>')+(p.caption?'<figcaption>'+esc(p.caption)+'</figcaption>':'')+'</figure>';
+  }).join('');
+  const more=state.visiblePhotos<m.photos.length?'<button type="button" class="journal-secondary" data-trip-memory-more>再看 '+Math.min(PHOTO_PAGE_SIZE,m.photos.length-state.visiblePhotos)+' 張</button>':'';
+  return '<div class="trip-memory-photo-grid">'+cards+'</div><div class="trip-memory-more">'+more+'</div>';
+}
