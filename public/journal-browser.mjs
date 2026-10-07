@@ -37,7 +37,7 @@ export function createBrowserJournalBinding({
 
   async function fetchConfig() {
     if (typeof fetchImpl !== 'function') throw new JournalClientError('fetch unavailable', { code:'journal_browser_fetch_unavailable', category:'transport', retryable:true });
-    const res = await fetchImpl('/api/cloud-config', { cache:'no-store' });
+    const res = await fetchImpl('/api/journal-config', { cache:'no-store' });
     if (!res?.ok) throw new JournalClientError(`cloud config HTTP ${res?.status || 0}`, { code:'journal_cloud_config_failed', category:'transport', retryable:true });
     const data = await res.json();
     if (!data?.configured || !data?.url || !data?.publishableKey || !data?.siteOrigin) {
@@ -209,6 +209,35 @@ export function createBrowserJournalBinding({
     mediaSignedUrl:async(storagePath, expiresIn = 900) => {
       const client = await getMediaClient();
       return client.signedUrl({ storagePath, expiresIn });
+    },
+    mediaSignedUrls:async(storagePaths, expiresIn = 900) => {
+      const client = await getMediaClient();
+      return client.signedUrls({ storagePaths, expiresIn });
+    },
+    listMediaForEntries:async(entryIds, {limit=240} = {}) => {
+      const supabase = await requireReady();
+      const workspaceId = await ensureWorkspace();
+      const ids=[...new Set((Array.isArray(entryIds)?entryIds:[]).map(String).filter(Boolean))];
+      const max=Math.max(1,Math.min(Number(limit)||240,500));
+      if(!ids.length)return [];
+      const out=[];
+      for(let i=0;i<ids.length&&out.length<max;i+=75){
+        const chunk=ids.slice(i,i+75);
+        const remaining=max-out.length;
+        const {data,error}=await supabase
+          .from('journal_media')
+          .select('id,entry_id,storage_path,mime_type,width,height,caption,taken_at,sort_order,created_at,version,upload_state,deleted_at')
+          .eq('workspace_id',workspaceId)
+          .in('entry_id',chunk)
+          .eq('upload_state','ready')
+          .is('deleted_at',null)
+          .order('taken_at',{ascending:true,nullsFirst:false})
+          .order('created_at',{ascending:true})
+          .limit(remaining);
+        if(error)throw error;
+        out.push(...(Array.isArray(data)?data:[]));
+      }
+      return out.slice(0,max);
     }
   };
   return Object.freeze(api);
