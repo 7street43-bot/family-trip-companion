@@ -16,6 +16,7 @@ function fakeTransport(){
     async rpc(name,args){calls.push(['rpc',name,args]);return {status:'applied',targetType:'media',targetId:args.p_media_id,version:args.p_action==='reserve'?1:2,operation:args.p_action==='reserve'?'register':'update'};},
     async upload(bucket,path,file,opts){calls.push(['upload',bucket,path,file,opts]);return {path};},
     async createSignedUrl(bucket,path,expires){calls.push(['signed',bucket,path,expires]);return `signed:${path}`;},
+    async createSignedUrls(bucket,paths,expires){calls.push(['signed-batch',bucket,paths,expires]);return paths.map(path=>({path,signedUrl:`signed:${path}`}));},
     isObjectExistsError(err){return err?.statusCode===409;}
   };
 }
@@ -77,7 +78,7 @@ test('signed URLs are private bucket only and expiry is bounded',async()=>{
 });
 
 test('Supabase transport blocks arbitrary RPCs/buckets and never exposes remove/update',async()=>{
-  const bucketApi={upload:async()=>({data:{},error:null}),createSignedUrl:async()=>({data:{signedUrl:'x'},error:null})};
+  const bucketApi={upload:async()=>({data:{},error:null}),createSignedUrl:async()=>({data:{signedUrl:'x'},error:null}),createSignedUrls:async(paths)=>({data:paths.map(path=>({path,signedUrl:`s:${path}`})),error:null})};
   const supabase={rpc:async()=>({data:{status:'applied'},error:null}),storage:{from:()=>bucketApi}};
   const t=createSupabaseJournalMediaTransport(supabase);
   await assert.rejects(()=>t.rpc('evil_rpc',{}),/rpc not allowed/);
@@ -94,4 +95,30 @@ test('15k generated paths remain unique across media ids',()=>{
     seen.add(buildJournalMediaPath({workspaceId:W,entryId:E,mediaId:id,mimeType:'image/jpeg'}));
   }
   assert.equal(seen.size,15000);
+});
+
+
+test('batch signed URLs deduplicate paths and use one private Storage call',async()=>{
+  const t=fakeTransport(),c=createJournalMediaClient({source:'mobile',transport:t});
+  const p1=buildJournalMediaPath({workspaceId:W,entryId:E,mediaId:M,mimeType:'image/jpeg'});
+  const p2=buildJournalMediaPath({workspaceId:W,entryId:E,mediaId:F,mimeType:'image/png'});
+  const rows=await c.signedUrls({storagePaths:[p1,p2,p1],expiresIn:30});
+  assert.equal(rows.length,2);
+  assert.deepEqual(t.calls.map(x=>x[0]),['signed-batch']);
+  assert.deepEqual(t.calls[0][2],[p1,p2]);
+  assert.equal(t.calls[0][3],60);
+});
+
+test('Supabase transport uses createSignedUrls for private batch signing',async()=>{
+  let seen=null;
+  const bucketApi={
+    upload:async()=>({data:{},error:null}),
+    createSignedUrl:async()=>({data:{signedUrl:'x'},error:null}),
+    createSignedUrls:async(paths,expires)=>{seen={paths,expires};return {data:paths.map(path=>({path,signedUrl:`s:${path}`})),error:null};}
+  };
+  const supabase={rpc:async()=>({data:{status:'applied'},error:null}),storage:{from:()=>bucketApi}};
+  const t=createSupabaseJournalMediaTransport(supabase);
+  const rows=await t.createSignedUrls('journal-media',['a.jpg','b.jpg'],900);
+  assert.deepEqual(seen,{paths:['a.jpg','b.jpg'],expires:900});
+  assert.equal(rows[1].signedUrl,'s:b.jpg');
 });
