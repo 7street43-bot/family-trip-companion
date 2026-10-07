@@ -43,6 +43,7 @@ jobs:
           node --check public/journal-yearly-photos.mjs
           node --check public/journal-yearly-story.mjs
           node --check public/journal-yearly-map.mjs
+          node --check public/journal-trip-memory.mjs
           node --check netlify/functions/journal-config.mjs
           node --check public/journal-media-preview-demo.mjs
           node --check public/journal-nav-bridge.mjs
@@ -56,6 +57,7 @@ jobs:
           node --test tests/journal-yearly-photos.test.mjs
           node --test tests/journal-j1g-yearly-story.test.mjs
           node --test tests/journal-j1g-yearly-map.test.mjs
+          node --test tests/journal-j1g-trip-memory.test.mjs
           node --test tests/j1k-journal-shell.test.mjs
       - name: Media security and deterministic UI invariants
         run: |
@@ -65,6 +67,14 @@ jobs:
           grep -Fq "import('./journal-yearly-photos.mjs')" public/journal-yearly.mjs
           grep -Fq "import('./journal-yearly-story.mjs')" public/journal-yearly.mjs
           grep -Fq "import('./journal-yearly-map.mjs')" public/journal-yearly.mjs
+          grep -Fq "import('./journal-trip-memory.mjs')" public/journal-yearly.mjs
+          grep -Fq "import('./journal-trip-memory.mjs')" public/journal-ui.mjs
+          ! grep -Fq 'journal-trip-memory.mjs' public/index.html
+          ! grep -Fq 'journal-trip-memory.mjs' public/sw.js
+          grep -Fq 'PHOTO_PAGE_SIZE=8' public/journal-trip-memory.mjs
+          grep -Fq 'MAX_TRIP_MEDIA=120' public/journal-trip-memory.mjs
+          grep -Fq 'routePlan' public/journal-trip-memory.mjs
+          grep -Fq 'schedulePlan' public/journal-trip-memory.mjs
           ! grep -Fq 'journal-yearly-map.mjs' public/index.html
           ! grep -Fq 'journal-yearly-map.mjs' public/sw.js
           grep -Fq 'leaflet@1.9.4' public/journal-yearly-map.mjs
@@ -133,7 +143,7 @@ jobs:
         run: |
           set -euo pipefail
           base='https://preview--comfy-heliotrope-475c71.netlify.app'
-          for p in /runtime-config.js /update-manager.js /journal-yearly-photos.mjs /journal-yearly-story.mjs /journal-yearly-map.mjs /api/journal-config /journal-shell.mjs /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-nav-bridge.mjs /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
+          for p in /runtime-config.js /update-manager.js /journal-yearly-photos.mjs /journal-yearly-story.mjs /journal-yearly-map.mjs /journal-trip-memory.mjs /api/journal-config /journal-shell.mjs /journal-media-ui.mjs /journal-media-preview-demo.mjs /journal-nav-bridge.mjs /journal-stable-layout.mjs /journal-browser.mjs /lib/journal-media-client.mjs /lib/journal-media-supabase-transport.mjs; do
             code=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors --retry-delay 1 -o /dev/null -w '%{http_code}' "$base$p?j1g=$GITHUB_SHA")
             test "$code" = 200 || { echo "$p -> $code"; exit 1; }
           done
