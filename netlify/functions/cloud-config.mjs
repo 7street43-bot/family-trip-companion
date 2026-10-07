@@ -1,5 +1,5 @@
-const DEFAULT_URL = 'https://iaecgwitsxghsovdkotw.supabase.co';
-const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_6der9Hrl7J1KLrrzuXCdKQ_yl-IpYRe';
+const DEFAULT_URL = 'https://edjnwbticmkajwdqbgjz.supabase.co';
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j';
 const DEFAULT_SITE_ORIGIN = 'https://comfy-heliotrope-475c71.netlify.app';
 
 export default async () => {
