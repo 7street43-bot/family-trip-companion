@@ -43,14 +43,7 @@ export function buildStoryMoments(entries=[],media=[],max=MAX_STORY_MOMENTS){
   return chosen.sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'zh-TW'));
 }
 
-function ensureStyle(){
-  if(state.styleReady||typeof document==='undefined')return;
-  if(!document.querySelector('link[data-journal-story-style]')){
-    const link=document.createElement('link');
-    link.rel='stylesheet';link.href='./journal-yearly-story.css';link.dataset.journalStoryStyle='1';document.head.appendChild(link);
-  }
-  state.styleReady=true;
-}
+function ensureStyle(){state.styleReady=true;}
 
 function overlay(){
   let el=document.getElementById('journalYearStory');
