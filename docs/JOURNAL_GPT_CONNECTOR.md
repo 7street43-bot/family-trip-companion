@@ -22,6 +22,10 @@
 - `journal_update_entry`
 - `journal_set_archived`
 - `journal_mutate_block`
+- `journal_reserve_media`
+- `journal_finalize_media`
+- `journal_update_media`
+- `journal_set_media_archived`
 
 The MCP server does **not** expose generic SQL, Supabase administration, or unrelated application tables.
 
@@ -38,22 +42,23 @@ The MCP server does **not** expose generic SQL, Supabase administration, or unre
 - `restoreBlock`
 - `listEntries`
 - `getEntry`
+- `reserveMedia`
+- `finalizeMedia`
+- `updateMedia`
+- `archiveMedia`
+- `restoreMedia`
 
 ## Activation gates
 
-The code path is Preview-ready, but Live activation remains fail-closed until all external gates pass:
+The Journal code path is Preview-ready on the dedicated Family Trip Companion Supabase project (`edjnwbticmkajwdqbgjz`). Live activation remains fail-closed until all external gates pass:
 
 1. Email Auth Custom SMTP is configured and Live Email Login passes.
 2. Supabase OAuth 2.1 Server is enabled.
 3. Authorization Path is exactly `/oauth/consent/` on the fixed Production Site URL.
 4. OAuth client registration / dynamic registration is configured according to the consuming MCP host.
 5. OAuth access-token validation and Family Workspace RLS are verified with a real non-production user/workspace first.
-6. ChatGPT account/workspace supports write-capable custom MCP apps.
-7. Create/read/update/conflict/replay tests pass before Production promotion.
-
-## Current OpenAI product boundary｜2026-10-01
-
-OpenAI currently documents full MCP write/modify support for ChatGPT Business, Enterprise and Edu workspaces. Pro supports custom MCP in developer mode for read/fetch, but not full MCP write actions. Therefore the application-side MCP can be prepared independently, while the final ChatGPT write Live Gate depends on the account/workspace capability available at activation time.
+6. ChatGPT-side user authorization is explicitly enabled for this project.
+7. Create/read/update/conflict/replay/media reserve-finalize tests pass before Production promotion.
 
 ## Security rules
 
@@ -69,3 +74,7 @@ OpenAI currently documents full MCP write/modify support for ChatGPT Business, E
 - Supabase MCP Authentication: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
 - OpenAI MCP / plugin server guidance: https://developers.openai.com/plugins/build/mcp-server
 - OpenAI Developer Mode / MCP availability: https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-apps-in-chatgpt-beta
+
+## Media contract
+
+GPT can reserve/finalize/update/archive/restore Journal media metadata. It cannot upload image binary through the MCP or `/api/journal-gpt`. The authenticated App/client remains responsible for uploading the actual file to the private `journal-media` bucket, after which GPT may finalize the reserved media record. No service-role credential is exposed.
