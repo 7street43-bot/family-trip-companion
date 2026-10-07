@@ -1,7 +1,7 @@
 import { createJournalClient, JournalClientError, normalizeJournalError } from '../../shared/journal-client.mjs';
 
-const DEFAULT_URL = 'https://iaecgwitsxghsovdkotw.supabase.co';
-const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_6der9Hrl7J1KLrrzuXCdKQ_yl-IpYRe';
+const DEFAULT_URL = 'https://edjnwbticmkajwdqbgjz.supabase.co';
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_g9rjLCbIIJo07h3z7UUKmg_yz3s176j';
 const RPCS = new Set(['journal_create','journal_update','journal_archive','journal_block_mutate']);
 const TABLES = new Set(['journal_entries','journal_blocks','journal_media','journal_revisions']);
 const FILTER_OPS = new Set(['eq','is','gte','lte']);
