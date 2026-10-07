@@ -131,8 +131,9 @@ function mount(){
   if(state.mounted)return;state.mounted=true;
   journalShell.on('rendered',ensurePanel);
   document.addEventListener('click',ev=>{
-    const t=ev.target.closest?.('[data-year-generate],[data-year-export]');if(!t)return;
+    const t=ev.target.closest?.('[data-year-generate],[data-year-export],[data-year-photo-load]');if(!t)return;
     if(t.matches('[data-year-generate]'))generate().catch(()=>{});
+    else if(t.matches('[data-year-photo-load]'))import('./journal-yearly-photos.mjs').then(m=>m.loadYearAlbum()).catch(err=>{state.error=String(err?.message||err||'年度相簿載入失敗。');render();});
     else exportReport(t.dataset.yearExport);
   });
   document.addEventListener('change',ev=>{const t=ev.target.closest?.('[data-year-input]');if(t){const y=Number(t.value);if(Number.isInteger(y))state.year=y;}});
