@@ -22,24 +22,32 @@ Supported commands:
 - `restoreBlock`
 - `listEntries`
 - `getEntry`
+- `reserveMedia`
+- `finalizeMedia`
+- `updateMedia`
+- `archiveMedia`
+- `restoreMedia`
 
-## ChatGPT Project activation boundary (2026-09-07)
+## Current activation boundary (2026-10-07)
 
-The backend is ready for user-scoped AI writes, but a Plus account cannot currently attach a private full-MCP app with write/modify actions directly to a Project. Do not work around this by storing a Supabase JWT or service-role key in Project instructions.
+The Journal backend is ready for user-scoped GPT reads/writes on the dedicated Family Trip Companion Supabase project. App authentication and the live ChatGPT-side user authorization path are intentionally deferred by project decision, so this connector must remain behind the Auth Live Gate. Never store a Supabase JWT, secret key, or service-role key in Project instructions.
 
-When account-side write-capable custom apps are available, use a remote MCP app with Supabase OAuth 2.1/OIDC. Supabase Auth can act as an OAuth 2.1 authorization server and issue normal user JWTs, so existing Journal RLS and workspace membership rules remain authoritative.
+Use user-scoped OAuth/OIDC when the ChatGPT-side connection is activated. Existing Journal RLS and workspace membership rules remain authoritative.
 
 ## Future activation sequence
 
-1. Enable Supabase OAuth 2.1 Server.
-2. Configure the production authorization path (planned: `/oauth/consent`).
-3. Register the ChatGPT/MCP client or enable MCP dynamic client registration where appropriate.
-4. Use asymmetric JWT signing (RS256/ES256) before requesting OIDC `openid` ID tokens.
-5. Remote MCP tools call the Journal gateway using the user's OAuth access token; never use service role.
-6. Keep write actions confirmation-aware and preserve `mutationId` idempotency.
-7. Test create/read/update/conflict/replay on a non-production workspace before enabling daily use.
+1. Finish the App Auth decision and Live Gate.
+2. Configure the user-scoped OAuth/OIDC authorization path for the ChatGPT-side connector.
+3. Remote tools call the Journal gateway using the user's access token; never use service role.
+4. Keep write actions confirmation-aware and preserve `mutationId` idempotency.
+5. Test create/read/update/conflict/replay/media reserve-finalize on a non-production workspace before enabling daily use.
 
 References:
 - Supabase OAuth 2.1 Server: https://supabase.com/docs/guides/auth/oauth-server
 - Supabase MCP Authentication: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
 - OpenAI custom MCP apps / developer mode: https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt-beta
+
+
+## Media safety contract
+
+GPT may reserve/finalize/update/archive/restore Journal media metadata, but it cannot directly upload binary files through `/api/journal-gpt`. Binary upload remains on the authenticated App/client path to the private `journal-media` bucket. This preserves the existing RLS path and prevents privileged Storage credentials from entering the GPT gateway.
