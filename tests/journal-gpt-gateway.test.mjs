@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { __test } from '../netlify/functions/journal-gpt.mjs';
 
-const BASE='https://iaecgwitsxghsovdkotw.supabase.co';
+const BASE='https://edjnwbticmkajwdqbgjz.supabase.co';
 const KEY='sb_publishable_test';
 const WID='11111111-1111-4111-8111-111111111111';
 
@@ -95,4 +95,50 @@ test('read commands do not require idempotency key and remain workspace scoped',
 test('unsupported command fails closed',async()=>{
   const res=await __test.handleJournalGpt(req({command:'rawSql'},{idem:null}),{fetchImpl:fakeFetch(),env});
   assert.equal(res.status,400);
+});
+
+
+test('reserveMedia derives a stable media id/path and forces gpt source',async()=>{
+  let seen=null;
+  const res=await __test.handleJournalGpt(req({
+    command:'reserveMedia',
+    entryId:'22222222-2222-4222-8222-222222222222',
+    mimeType:'image/jpeg',
+    caption:'雙寶在公園'
+  },{idem:'media-reserve-1'}),{
+    fetchImpl:fakeFetch({onRpc:(n,p)=>{if(n==='journal_media_mutate')seen=p;}}),env
+  });
+  assert.equal(res.status,200);
+  assert.equal(seen.p_action,'reserve');
+  assert.equal(seen.p_source,'gpt');
+  assert.equal(seen.p_workspace_id,WID);
+  assert.match(seen.p_media_id,/^[0-9a-f-]{36}$/i);
+  assert.equal(seen.p_payload.mime_type,'image/jpeg');
+  assert.ok(seen.p_payload.storage_path.startsWith(`${WID}/22222222-2222-4222-8222-222222222222/`));
+  assert.ok(seen.p_payload.storage_path.endsWith('.jpg'));
+});
+
+test('finalizeMedia remains versioned and workspace scoped',async()=>{
+  let seen=null;
+  const mediaId='33333333-3333-4333-8333-333333333333';
+  const res=await __test.handleJournalGpt(req({
+    command:'finalizeMedia',
+    entryId:'22222222-2222-4222-8222-222222222222',
+    mediaId,
+    expectedVersion:1
+  },{idem:'media-finalize-1'}),{
+    fetchImpl:fakeFetch({onRpc:(n,p)=>{if(n==='journal_media_mutate')seen=p;}}),env
+  });
+  assert.equal(res.status,200);
+  assert.equal(seen.p_action,'finalize');
+  assert.equal(seen.p_media_id,mediaId);
+  assert.equal(seen.p_expected_version,1);
+  assert.equal(seen.p_source,'gpt');
+});
+
+test('GPT gateway refuses direct binary upload commands',async()=>{
+  const res=await __test.handleJournalGpt(req({command:'uploadMedia'},{idem:'x'}),{fetchImpl:fakeFetch(),env});
+  assert.equal(res.status,400);
+  const body=await res.json();
+  assert.equal(body.error,'invalid_command');
 });
