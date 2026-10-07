@@ -118,3 +118,29 @@ export async function openYearStory(){
     state.loading=false;render();await warmWindow();
   }catch(err){state.loading=false;state.error=String(err?.message||err||'年度故事載入失敗。');render();}
 }
+
+function mount(){
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest?.('[data-story-close],[data-story-prev],[data-story-next],[data-story-play]');if(!t)return;
+    if(t.matches('[data-story-close]'))closeStory();
+    else if(t.matches('[data-story-prev]'))go(state.index-1);
+    else if(t.matches('[data-story-next]'))go(state.index+1);
+    else if(t.matches('[data-story-play]'))setPlaying(!state.playing);
+  });
+  document.addEventListener('keydown',ev=>{
+    if(overlay()?.hidden!==false)return;
+    if(ev.key==='Escape')closeStory();
+    else if(ev.key==='ArrowLeft')go(state.index-1);
+    else if(ev.key==='ArrowRight')go(state.index+1);
+    else if(ev.key===' '){ev.preventDefault();setPlaying(!state.playing);}
+  });
+  document.addEventListener('pointerdown',ev=>{if(overlay()?.hidden===false)state.swipeX=Number(ev.clientX);});
+  document.addEventListener('pointerup',ev=>{
+    if(state.swipeX==null||overlay()?.hidden!==false)return;
+    const dx=Number(ev.clientX)-state.swipeX;state.swipeX=null;
+    if(Math.abs(dx)>=60)go(state.index+(dx<0?1:-1));
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible'&&state.playing)setPlaying(false);});
+}
+if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
+export const __test={MAX_STORY_MOMENTS,SIGN_WINDOW,AUTO_MS};
