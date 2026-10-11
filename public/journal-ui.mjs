@@ -84,7 +84,7 @@ function editorHtml(){
   if(!e)return `<div class="journal-editor"><div class="journal-empty">點一篇日誌即可查看或修改。</div></div>`;
   const places=extractPlaces(e),tags=visibleTags(e.tags);
   return `<form id="journalEditForm" class="journal-editor" data-id="${esc(e.id)}" data-version="${Number(e.version)||1}">
-    <h3>編輯日誌</h3>
+    <div class="journal-editor-head"><button class="journal-back-btn" type="button" data-journal-back>返回日誌</button><h3>編輯日誌</h3></div>
     <input name="places" type="hidden" value="${esc(places.join(', '))}">
     <input name="tags" type="hidden" value="${esc(tags.join(', '))}">
     <input name="participants" type="hidden" value="${esc((e.participants||[]).join(', '))}">
