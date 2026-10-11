@@ -5,6 +5,8 @@ on:
     branches: [preview]
     paths:
       - 'public/journal-ui.mjs'
+      - 'public/journal-shell.mjs'
+      - 'public/app.js'
       - 'public/journal-yearly.mjs'
       - 'public/journal.css'
       - 'public/journal-browser.mjs'
@@ -35,6 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           node --check public/journal-ui.mjs
+          node --check public/journal-shell.mjs
+          node --check public/app.js
           node --check public/journal-yearly.mjs
           node --check public/journal-browser.mjs
           node --check netlify/functions/journal-gpt.mjs
@@ -62,6 +66,12 @@ jobs:
           grep -Fq '收起這篇' public/journal-ui.mjs
           grep -Fq '@place:' public/journal-ui.mjs
           grep -Fq 'searchEntriesLocal' public/journal-ui.mjs
+          grep -Fq 'normalizeTripDraft' public/journal-ui.mjs
+          grep -Fq 'name="tripRef"' public/journal-ui.mjs
+          grep -Fq 'openDraft' public/journal-shell.mjs
+          grep -Fq 'data-trip-journal-draft' public/app.js
+          grep -Fq '整理今天回憶' public/app.js
+          grep -Fq 'tripRef:trip?.id' public/app.js
           grep -Fq "source:'gpt'" netlify/functions/journal-gpt.mjs
           grep -Fq "journal_reserve_media" netlify/functions/journal-mcp.mjs
           grep -Fq "journal_finalize_media" netlify/functions/journal-mcp.mjs
