@@ -61,6 +61,13 @@ jobs:
           grep -Fq '@place:' public/journal-ui.mjs
           grep -Fq 'searchEntriesLocal' public/journal-ui.mjs
           grep -Fq '新增日誌' public/journal-ui.mjs
+          grep -Fq 'data-journal-new' public/journal-ui.mjs
+          grep -Fq 'data-journal-cancel-new' public/journal-ui.mjs
+          grep -Fq 'data-journal-back' public/journal-ui.mjs
+          grep -Fq 'composing:false' public/journal-ui.mjs
+          ! grep -Fq 'data-journal-sync' public/journal-ui.mjs
+          grep -Fq '.journal-panel:not(.has-selection) .journal-right' public/journal.css
+          grep -Fq '.journal-panel.has-selection .journal-left' public/journal.css
           grep -Fq 'placeholder="搜尋日誌"' public/journal-ui.mjs
           grep -Fq '編輯日誌' public/journal-ui.mjs
           grep -Fq 'journalMediaSection' public/journal-ui.mjs
@@ -80,7 +87,7 @@ jobs:
           ! grep -R "SERVICE_ROLE\|service_role" -n public/journal-ui.mjs public/journal-browser.mjs netlify/functions/journal-gpt.mjs
           node -e "const v=JSON.parse(require('fs').readFileSync('public/version.json')); if(!/^4\\.5\\.0-phase1\\./.test(v.version)) process.exit(1)"
       - name: Result
-        run: echo 'J1F SIMPLE JOURNAL + MOBILE + DESKTOP + GPT CONTRACT = PASS'
+        run: echo 'J1F MOBILE-FIRST SIMPLE JOURNAL + DESKTOP + GPT CONTRACT = PASS'
 
   preview-smoke:
     needs: contract
@@ -116,6 +123,10 @@ jobs:
           grep -Fq 'journal.css' /tmp/index.html
           curl --fail --silent --show-error --location "$base/journal-ui.mjs?j1f=$GITHUB_SHA" -o /tmp/journal-ui.mjs
           grep -Fq '新增日誌' /tmp/journal-ui.mjs
+          grep -Fq 'data-journal-new' /tmp/journal-ui.mjs
+          grep -Fq 'data-journal-cancel-new' /tmp/journal-ui.mjs
+          grep -Fq 'data-journal-back' /tmp/journal-ui.mjs
+          ! grep -Fq 'data-journal-sync' /tmp/journal-ui.mjs
           grep -Fq 'placeholder="搜尋日誌"' /tmp/journal-ui.mjs
           grep -Fq '編輯日誌' /tmp/journal-ui.mjs
           ! grep -Fq 'data-journal-tab=' /tmp/journal-ui.mjs
@@ -141,4 +152,4 @@ jobs:
           test "$code" = 401 || { cat /tmp/mcp-noauth.json; exit 1; }
           grep -Fq 'invalid_token' /tmp/mcp-noauth.json
       - name: Result
-        run: echo 'J1F PREVIEW SIMPLE JOURNAL + GPT/MCP AUTH GATE = PASS'
+        run: echo 'J1F PREVIEW MOBILE-FIRST JOURNAL + GPT/MCP AUTH GATE = PASS'
