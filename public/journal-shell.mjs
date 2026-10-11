@@ -1,6 +1,6 @@
 const listeners=new Map();
 const state={open:false,tab:'quick',pending:0,selectedEntryId:null,renderEpoch:0};
-let commands={open:null,close:null,openEntry:null};
+let commands={open:null,close:null,openEntry:null,openDraft:null};
 
 function snapshot(){return {...state};}
 function emit(type,detail={}){for(const fn of listeners.get(type)||[]){try{fn(detail,snapshot());}catch(err){console.error('Journal shell listener failed',type,err);}}}
@@ -12,17 +12,18 @@ function patch(next,type='state'){
   return changed;
 }
 function runtimeVersion(){return String(globalThis.TwinRuntime?.version||'unknown');}
-function registerCommands(next={}){commands={open:typeof next.open==='function'?next.open:commands.open,close:typeof next.close==='function'?next.close:commands.close,openEntry:typeof next.openEntry==='function'?next.openEntry:commands.openEntry};}
+function registerCommands(next={}){commands={open:typeof next.open==='function'?next.open:commands.open,close:typeof next.close==='function'?next.close:commands.close,openEntry:typeof next.openEntry==='function'?next.openEntry:commands.openEntry,openDraft:typeof next.openDraft==='function'?next.openDraft:commands.openDraft};}
 async function open(){if(!commands.open)throw new Error('journal_open_not_registered');return commands.open();}
 async function close(){if(!commands.close)return false;return commands.close();}
 async function openEntry(id){if(!commands.openEntry)throw new Error('journal_open_entry_not_registered');return commands.openEntry(String(id||''));}
+async function openDraft(input={}){if(!commands.openDraft)throw new Error('journal_open_draft_not_registered');return commands.openDraft(input||{});}
 function setOpen(open){return patch({open:!!open},'open');}
 function setTab(tab){if(!['quick','history','search'].includes(tab))return false;return patch({tab},'tab');}
 function setPending(pending){const n=Math.max(0,Number(pending)||0);return patch({pending:n},'pending');}
 function setSelectedEntryId(id){return patch({selectedEntryId:id?String(id):null},'selection');}
 function rendered(detail={}){state.renderEpoch+=1;emit('rendered',{...detail,renderEpoch:state.renderEpoch},snapshot());}
 
-const api=Object.freeze({on,snapshot,runtimeVersion,registerCommands,open,close,openEntry,setOpen,setTab,setPending,setSelectedEntryId,rendered});
+const api=Object.freeze({on,snapshot,runtimeVersion,registerCommands,open,close,openEntry,openDraft,setOpen,setTab,setPending,setSelectedEntryId,rendered});
 if(typeof window!=='undefined')window.TwinJournalShell=api;
 export default api;
 export const __test={snapshot,patch};
