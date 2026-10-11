@@ -1635,6 +1635,25 @@
   }
 
   function durationText(m) { const h=Math.floor(m/60), r=m%60; return `${h?h+'小時':''}${r?r+'分':''}` || '0分'; }
+  function buildTripJournalDraft(trip){
+    const stops=[...(trip?.stops||[])].sort((a,b)=>(a.order||0)-(b.order||0));
+    const completed=stops.filter(s=>s.done);
+    const source=completed.length?completed:stops;
+    const places=[...new Set(source.filter(s=>!['start','home'].includes(String(s.type||''))).map(stopTitle).map(x=>String(x||'').trim()).filter(Boolean))];
+    const lines=[];
+    if(places.length)lines.push('今天去了：'+places.join('、')+'。');
+    if(String(trip?.notes||'').trim())lines.push('行程備註：'+String(trip.notes).trim());
+    lines.push('最有印象的是：');
+    return {
+      entryDate:String(trip?.date||todayISO()),
+      title:(String(trip?.title||'這趟旅行').trim()||'這趟旅行')+'｜旅遊日誌',
+      summary:lines.join('\n'),
+      places,
+      tags:['行程日誌'],
+      participants:Array.isArray(trip?.participants)?trip.participants.map(String).filter(Boolean):[],
+      tripRef:trip?.id==null?null:String(trip.id)
+    };
+  }
   function renderTripDetail() {
     const t=state.itineraries.find(x=>x.id===state.selectedTripId);
     if (!t) { state.selectedTripId=null; return renderTrips(); }
