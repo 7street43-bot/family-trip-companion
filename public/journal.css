@@ -13,3 +13,14 @@
   .journal-body{height:0;flex:1 1 0;padding-top:12px;padding-bottom:22px;scroll-behavior:auto}
   .journal-empty{min-height:156px;box-sizing:border-box;display:grid;place-items:center;align-content:center}
 }
+
+.journal-new-btn{width:100%;border:0;border-radius:14px;min-height:50px;padding:12px 16px;background:#213547;color:#fff;font:800 15px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
+.journal-editor-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.journal-editor-head h3{margin:0}
+.journal-back-btn{display:none;border:0;border-radius:12px;min-height:44px;padding:10px 12px;background:#eef0ef;color:#213547;font:700 13px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
+@media(max-width:899px){
+  .journal-panel:not(.has-selection) .journal-right{display:none}
+  .journal-panel.has-selection .journal-left{display:none}
+  .journal-panel.has-selection .journal-right{display:block;overflow:auto}
+  .journal-back-btn{display:inline-flex;align-items:center}
+}
