@@ -77,7 +77,7 @@ function simpleSearchHtml(){
   else body='<div class="journal-list">'+result.map(entryButton).join('')+'</div>';
   return '<form id="journalSearchForm" class="journal-search-simple"><input name="query" value="'+esc(state.searchQuery)+'" placeholder="搜尋日誌"><button class="journal-secondary" type="submit">搜尋</button></form><div class="journal-section-title"><h3>'+(state.searchQuery?'搜尋結果':'最近日誌')+'</h3><span>'+result.length+' 篇</span></div>'+body;
 }
-function mainHtml(){return quickForm()+simpleSearchHtml();}
+function mainHtml(){if(state.composing||state.draft)return quickForm();return '<button class="journal-new-btn" type="button" data-journal-new>＋ 新增日誌</button>'+simpleSearchHtml();}
 
 function editorHtml(){
   const e=state.selected?.entry;
