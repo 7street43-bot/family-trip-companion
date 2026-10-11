@@ -15,7 +15,6 @@ export function validatePhotoFile(file){if(!file)return {ok:false,reason:'沒有
 function section(){return document.getElementById('journalMediaSection');}
 function selectedEntryId(){return String(journalShell.snapshot().selectedEntryId||section()?.dataset?.entryId||'');}
 function statusMessage(text,type=''){state.message=String(text||'');state.messageType=type;renderSection();}
-function captionInput(mediaId){return [...(section()?.querySelectorAll('[data-media-caption-input]')||[])].find(el=>el.dataset.mediaCaptionInput===mediaId)||null;}
 async function status(){try{await journalBinding.init();return await journalBinding.getStatus();}catch(err){return {configured:false,authenticated:false,originMatch:false,error:err?.message||String(err)};}}
 async function hydrateUrls(items,token){const next=new Map();for(const m of items){if(token!==state.seq)return;try{next.set(m.id,await journalBinding.mediaSignedUrl(m.storage_path,900));}catch(_){next.set(m.id,'');}}if(token===state.seq)state.urls=next;}
 async function loadAlbum(entryId=selectedEntryId()){if(!entryId)return;const token=++state.seq;state.entryId=entryId;state.loading=true;renderSection();try{const s=await status();if(token!==state.seq)return;if(!s.originMatch||!s.authenticated){state.media=[];state.urls=new Map();return;}const detail=await journalBinding.getEntry(entryId,{includeRevisions:false});if(token!==state.seq)return;state.media=Array.isArray(detail?.media)?detail.media:[];await hydrateUrls(visibleMedia(state.media,false),token);}catch(err){if(token===state.seq){state.message=err?.message||'讀取照片失敗。';state.messageType='error';}}finally{if(token===state.seq){state.loading=false;renderSection();}}}
@@ -40,7 +39,28 @@ function renderSection(){
 function syncFromRender(detail={}){if(!detail.open){state.entryId=null;state.media=[];state.urls=new Map();return;}const id=String(detail.selectedEntryId||'');if(!id)return;if(id!==state.entryId){state.message='';state.messageType='';loadAlbum(id).catch(()=>{});}else renderSection();}
 
 async function uploadSelected(){const id=selectedEntryId(),input=section()?.querySelector('[data-journal-media-files]'),files=[...(input?.files||[])];if(!id||!files.length)return statusMessage('請先選擇至少一張照片。','error');const s=await status();if(!s.originMatch)return statusMessage('Preview 安全模式只驗收相簿介面，不會上傳正式照片。','error');if(!s.authenticated)return statusMessage('請先登入家庭雲端，再上傳照片。','error');if(!navigator.onLine)return statusMessage('照片上傳需要網路連線；文字日誌仍可離線使用。','error');const invalid=files.map(f=>({f,v:validatePhotoFile(f)})).find(x=>!x.v.ok);if(invalid)return statusMessage(`${invalid.f.name||'照片'}：${invalid.v.reason}`,'error');state.loading=true;state.message='';renderSection();let ok=0,failed=0,order=Math.max(0,...state.media.map(m=>Number(m.sort_order)||0))+100;for(const file of files.slice(0,20)){try{const r=await journalBinding.uploadPhoto(id,file,{takenAt:safeTakenAt(file),sortOrder:order});if(r?.result?.status==='applied'||r?.result?.status==='replayed')ok++;else failed++;}catch(_){failed++;}order+=100;}if(input)input.value='';state.loading=false;await loadAlbum(id);statusMessage(failed?`已加入 ${ok} 張；${failed} 張未完成，可重新選取再試。`:`已加入 ${ok} 張照片。`,failed?'error':'good');}
-async function saveCaption(button){const id=selectedEntryId(),mediaId=String(button.dataset.mediaCaptionSave||''),version=Number(button.dataset.version),input=captionInput(mediaId);if(!id||!mediaId||!input)return;const nextCaption=String(input.value||'').trim()||null,s=await status();if(!s.originMatch)return statusMessage('Preview 安全模式不修改正式照片。','error');state.loading=true;renderSection();try{const r=await journalBinding.updateMedia(id,mediaId,version,{caption:nextCaption});if(r?.status==='conflict')statusMessage('照片版本已更新，已重新載入，請再確認一次。','error');else statusMessage('照片說明已更新。','good');}catch(err){statusMessage(err?.message||'更新照片說明失敗。','error');}finally{state.loading=false;await loadAlbum(id);}}
-async function setMediaHidden(button,hidden){const id=selectedEntryId(),mediaId=String(hidden?button.dataset.mediaArchive:button.dataset.mediaRestore),version=Number(button.dataset.version);if(!id||!mediaId)return;const s=await status();if(!s.originMatch)return statusMessage('Preview 安全模式不修改正式照片。','error');if(hidden&&!confirm('收起這張照片？之後可用「查看已收起照片」找回。'))return;state.loading=true;renderSection();try{const r=hidden?await journalBinding.archiveMedia(id,mediaId,version):await journalBinding.restoreMedia(id,mediaId,version);if(r?.status==='conflict')statusMessage('照片版本已更新，請重新確認。','error');else statusMessage(hidden?'照片已收起。':'照片已恢復顯示。','good');}catch(err){statusMessage(err?.message||'照片操作失敗。','error');}finally{state.loading=false;await loadAlbum(id);}}
-function mount(){journalShell.on('rendered',syncFromRender);document.addEventListener('click',ev=>{const t=ev.target.closest?.('[data-journal-media-upload],[data-media-caption-save],[data-media-archive],[data-media-restore],[data-media-hidden]');if(!t)return;if(t.matches('[data-journal-media-upload]'))uploadSelected().catch(err=>statusMessage(err?.message||'照片上傳失敗。','error'));else if(t.dataset.mediaCaptionSave)saveCaption(t).catch(()=>{});else if(t.dataset.mediaArchive)setMediaHidden(t,true).catch(()=>{});else if(t.dataset.mediaRestore)setMediaHidden(t,false).catch(()=>{});else if(t.matches('[data-media-hidden]')){state.showHidden=!state.showHidden;loadAlbum().catch(()=>{});}});syncFromRender(journalShell.snapshot());}
+async function deleteMedia(button){
+  const id=selectedEntryId(),mediaId=String(button.dataset.mediaDelete||''),version=Number(button.dataset.version);
+  if(!id||!mediaId)return;
+  const s=await status();
+  if(!s.originMatch)return statusMessage('Preview 安全模式不修改正式照片。','error');
+  if(!confirm('刪除這張照片？'))return;
+  state.loading=true;renderSection();
+  try{
+    const r=await journalBinding.archiveMedia(id,mediaId,version);
+    if(r?.status==='conflict')statusMessage('照片已被更新，請重新確認。','error');
+    else statusMessage('照片已刪除。','good');
+  }catch(err){statusMessage(err?.message||'刪除照片失敗。','error');}
+  finally{state.loading=false;await loadAlbum(id);}
+}
+function mount(){
+  journalShell.on('rendered',syncFromRender);
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest?.('[data-journal-media-upload],[data-media-delete]');
+    if(!t)return;
+    if(t.matches('[data-journal-media-upload]'))uploadSelected().catch(err=>statusMessage(err?.message||'照片上傳失敗。','error'));
+    else if(t.dataset.mediaDelete)deleteMedia(t).catch(()=>{});
+  });
+  syncFromRender(journalShell.snapshot());
+}
 if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
