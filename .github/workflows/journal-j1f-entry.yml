@@ -68,6 +68,7 @@ jobs:
           ! grep -Fq 'data-journal-sync' public/journal-ui.mjs
           grep -Fq '.journal-panel:not(.has-selection) .journal-right' public/journal.css
           grep -Fq '.journal-panel.has-selection .journal-left' public/journal.css
+          grep -Fq '.journal-new-btn' public/journal.css
           grep -Fq 'placeholder="搜尋日誌"' public/journal-ui.mjs
           grep -Fq '編輯日誌' public/journal-ui.mjs
           grep -Fq 'journalMediaSection' public/journal-ui.mjs
