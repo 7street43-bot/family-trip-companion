@@ -9,5 +9,3 @@ A static PWA for family trip planning and in-trip assistance.
 ## Journal development
 - J1F.3 is released to Production.
 - J1G private photo/media Storage is under Preview-only draft + security stress validation.
-
-<!-- Journal simple UI candidate -->
