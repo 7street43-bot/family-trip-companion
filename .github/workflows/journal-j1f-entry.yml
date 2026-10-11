@@ -15,6 +15,7 @@ on:
       - 'public/sw.js'
       - 'netlify/functions/journal-gpt.mjs'
       - 'tests/journal-j1f-ui.test.mjs'
+      - 'tests/j1k-journal-shell.test.mjs'
       - 'tests/journal-yearly.test.mjs'
       - 'tests/journal-gpt-gateway.test.mjs'
       - 'tests/journal-mcp-contract.test.mjs'
@@ -44,6 +45,7 @@ jobs:
           node --check netlify/functions/journal-gpt.mjs
           node --check public/sw.js
           node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/j1k-journal-shell.test.mjs
           node --test tests/journal-yearly.test.mjs
           node --test tests/journal-gpt-gateway.test.mjs
           node --test tests/journal-mcp-contract.test.mjs
