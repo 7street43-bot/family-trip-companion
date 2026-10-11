@@ -1658,7 +1658,7 @@
     const t=state.itineraries.find(x=>x.id===state.selectedTripId);
     if (!t) { state.selectedTripId=null; return renderTrips(); }
     const stops=[...(t.stops||[])].sort((a,b)=>(a.order||0)-(b.order||0));
-    return `${offlineBanner()}<div class="page-title-row"><div><button class="btn small" data-back-trips>‹ 所有行程</button><h1 class="page-title" style="margin-top:12px">${esc(t.title)}</h1><p class="page-subtitle">${esc(fmtDate(t.date))}・${stops.length} 站</p></div><div class="trip-head-actions"><button class="btn primary small" data-trip-companion="${esc(t.id)}">出遊模式</button><button class="btn soft small" data-edit-trip="${esc(t.id)}">編輯</button></div></div>
+    return `${offlineBanner()}<div class="page-title-row"><div><button class="btn small" data-back-trips>‹ 所有行程</button><h1 class="page-title" style="margin-top:12px">${esc(t.title)}</h1><p class="page-subtitle">${esc(fmtDate(t.date))}・${stops.length} 站</p></div><div class="trip-head-actions"><button class="btn primary small" data-trip-companion="${esc(t.id)}">出遊模式</button><button class="btn soft small" data-trip-journal-draft="${esc(t.id)}">整理日誌</button><button class="btn soft small" data-edit-trip="${esc(t.id)}">編輯</button></div></div>
       <div class="stat-row"><span class="stat-pill">${stops.length} 站</span><span class="stat-pill">開始 ${esc(t.startTime||'09:00')}</span>${t.notes?`<span class="stat-pill">有備註</span>`:''}</div>
       ${t.scheduleDirty?`<div class="schedule-warning"><div><strong>站點順序已變更</strong><small>目前時間可能還是舊順序。</small></div><button class="btn small" data-reschedule-trip="${esc(t.id)}">重新排時間</button></div>`:''}
       ${stops.length?`<div class="timeline" id="stopList">${stops.map(s=>stopRow(s,t)).join('')}</div><div class="helper trip-time-note">自動時間使用站點直線距離分級估算交通緩衝，不代表實際車程；手動輸入的時間會鎖定保留。</div>`:`<div class="empty-state"><div class="empty-icon">＋</div><h3>還沒有站點</h3><p>可以先加「出發」「午餐」「景點」等空站，再慢慢補資料。</p></div>`}
@@ -1673,7 +1673,7 @@
     const t=state.itineraries.find(x=>x.id===state.selectedTripId);if(!t){state.tripCompanion=false;return renderTrips();}
     const stops=[...(t.stops||[])].sort((a,b)=>(a.order||0)-(b.order||0)),next=stops.find(s=>!s.done),nextIndex=next?stops.findIndex(s=>s.id===next.id):-1,future=nextIndex>=0?stops.slice(nextIndex+1,nextIndex+3):[];
     return `${offlineBanner()}<div class="companion-head"><button class="btn small" data-exit-companion>‹ 行程</button><div><small>Family Trip Companion</small><h1>${esc(t.title)}</h1><span>${esc(fmtDate(t.date))}</span></div></div>
-      ${next?`<section class="companion-next"><div class="section-head"><h2 class="section-title">現在先處理這一站</h2></div>${tripCompanionStopCard(next,{next:true})}</section>`:`<div class="companion-done"><strong>今天的站點都完成了</strong><p>可以回行程調整，或直接回家休息。</p></div>`}
+      ${next?`<section class="companion-next"><div class="section-head"><h2 class="section-title">現在先處理這一站</h2></div>${tripCompanionStopCard(next,{next:true})}</section>`:`<div class="companion-done"><strong>今天的站點都完成了</strong><p>可以回行程調整，或把今天整理成旅遊日誌。</p><button class="btn primary" data-trip-journal-draft="${esc(t.id)}">整理今天回憶</button></div>`}
       <section class="companion-tools"><button class="companion-tool" data-view-jump="pack"><strong>${esc(packProgressSummary(t))}</strong><span>外出包</span></button><button class="companion-tool" data-open-trip-normal="${esc(t.id)}"><strong>${stops.filter(s=>s.done).length}/${stops.length}</strong><span>行程進度</span></button>${next?`<button class="companion-tool" data-plan-b-search="${esc(next.id)}"><strong>找備案</strong><span>收藏＋Google</span></button>`:''}</section>
       ${future.length?`<section class="section"><div class="section-head"><h2 class="section-title">接下來</h2></div><div class="companion-upcoming">${future.map(s=>tripCompanionStopCard(s)).join('')}</div></section>`:''}
       <div class="helper companion-disclaimer">出遊模式只整合既有行程、導航、Plan B 與外出包；V4.4 不假裝提供即時天氣或即時車程。</div>`;
@@ -3342,6 +3342,13 @@
     if (t.matches('[data-plan-b-text]')) return planBTextSearchModal(t.dataset.tripId,t.dataset.planBText);
     if (t.matches('[data-plan-b-saved]')) return setSavedPlanB(t.dataset.tripId,t.dataset.stopId,t.dataset.planBSaved);
     if (t.matches('[data-plan-b-google]')) { const c=state.planBGoogleCandidates?.[Number(t.dataset.planBGoogle)];if(c)return setGooglePlanB(t.dataset.tripId,t.dataset.stopId,c);return; }
+    if (t.matches('[data-trip-journal-draft]')) {
+      const trip=state.itineraries.find(x=>x.id===t.dataset.tripJournalDraft);
+      if(!trip)return;
+      if(!window.TwinJournalShell?.openDraft){toast('旅遊日誌尚未就緒');return;}
+      await window.TwinJournalShell.openDraft(buildTripJournalDraft(trip));
+      return;
+    }
     if (t.matches('[data-complete-stop]')) { const trip=state.itineraries.find(x=>x.id===state.selectedTripId),s=trip?.stops?.find(x=>x.id===t.dataset.completeStop);if(!trip||!s)return;const sid=s.id;s.done=true;s.completedAt=new Date().toISOString();trip.updatedAt=new Date().toISOString();await TwinDB.put('itineraries',trip);await reloadData();render();toast('已完成這一站','復原',async()=>{const fresh=await TwinDB.get('itineraries',trip.id),row=fresh?.stops?.find(x=>x.id===sid);if(!fresh||!row)return;row.done=false;row.completedAt='';fresh.updatedAt=new Date().toISOString();await TwinDB.put('itineraries',fresh);await reloadData();render();toast('已復原');},6000);return; }
     if (t.matches('[data-nearby]')) { if(!navigator.geolocation){toast('此裝置不支援定位');return;} navigator.geolocation.getCurrentPosition(pos=>{state.explore.userPos={lat:pos.coords.latitude,lng:pos.coords.longitude};state.explore.nearby=true;render();},()=>toast('無法取得定位，請檢查瀏覽器權限')); return; }
     if (t.matches('[data-new-trip]')) return tripForm();
