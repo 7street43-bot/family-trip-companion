@@ -64,7 +64,7 @@ function quickForm(){
       <div class="journal-field"><label>標題 <small>可不填</small></label><input name="title" maxlength="120" value="${esc(d.title)}" placeholder="例如：六福村的一天"></div>
       <div class="journal-field"><label>內容</label><textarea name="summary" maxlength="12000" placeholder="今天發生了什麼？" required>${esc(d.summary)}</textarea></div>
     </div>
-    <div class="journal-actions"><button class="journal-primary" type="submit">儲存日誌</button></div>
+    <div class="journal-actions"><button class="journal-primary" type="submit">儲存日誌</button><button class="journal-secondary" type="button" data-journal-cancel-new>取消</button></div>
   </form>`;
 }
 function entryButton(e){const places=extractPlaces(e);return `<button class="journal-item ${state.selected?.entry?.id===e.id?'active':''}" data-journal-select="${esc(e.id)}"><div class="journal-item-title"><strong>${esc(entryLabel(e))}</strong></div><small>${esc(fmtDate(e.entry_date))}</small>${places.length?`<div class="journal-place-line">📍 ${places.map(esc).join('、')}</div>`:''}${e.summary?`<p>${esc(e.summary)}</p>`:''}</button>`;}
