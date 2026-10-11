@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitCsv, todayLocal, entryLabel, queueRecord, encodePlaceTags, extractPlaces, visibleTags, periodBounds, searchEntriesLocal, groupHistory } from '../public/journal-ui.mjs';
+import { splitCsv, todayLocal, entryLabel, queueRecord, encodePlaceTags, extractPlaces, visibleTags, periodBounds, searchEntriesLocal, groupHistory, normalizeTripDraft } from '../public/journal-ui.mjs';
 
 test('splitCsv trims, deduplicates and accepts Chinese comma',()=>{
   assert.deepEqual(splitCsv('六福村, 第一次，六福村, 雙寶'),['六福村','第一次','雙寶']);
@@ -65,4 +65,12 @@ test('history groups entries by year-month and summarizes places',()=>{
   assert.equal(groups[0].key,'2026-09');
   assert.deepEqual(groups[0].places,['六福村','南寮']);
   assert.equal(groups[1].key,'2026-08');
+});
+test('itinerary draft preserves trip link and normalizes prefill fields',()=>{
+  const d=normalizeTripDraft({entryDate:'2026-10-11',title:'桃園一日遊｜旅遊日誌',summary:'今天去了：Xpark。',places:['Xpark',' Xpark ','華泰'],tags:['行程日誌','行程日誌'],participants:['曜澄','曜濰'],tripRef:'trip-123'});
+  assert.equal(d.entryDate,'2026-10-11');
+  assert.equal(d.tripRef,'trip-123');
+  assert.deepEqual(d.places,['Xpark','華泰']);
+  assert.deepEqual(d.tags,['行程日誌']);
+  assert.deepEqual(d.participants,['曜澄','曜濰']);
 });
