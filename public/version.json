@@ -1,7 +1,7 @@
 {
-  "version": "4.5.0-phase1.19-journal.1",
-  "cache": "twin-trip-v4.5.0-phase1.19-journal.1",
+  "version": "4.5.0-phase1.20-journal.1",
+  "cache": "twin-trip-v4.5.0-phase1.20-journal.1",
   "builtAt": "2026-10-11",
   "channel": "JOURNAL",
-  "previewFeature": "simple-journal-ui+add-search-edit-photos"
+  "previewFeature": "mobile-first-journal-list+collapsed-composer"
 }
