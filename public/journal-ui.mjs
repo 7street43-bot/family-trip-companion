@@ -3,7 +3,7 @@ import journalShell from './journal-shell.mjs';
 
 const QUEUE_KEY='journalJ1FQueue';
 const PLACE_PREFIX='@place:';
-const state={open:false,status:null,recent:[],history:[],searchCorpus:[],searchResults:[],selected:null,pending:[],loading:false,message:'',messageType:'',activeTab:'quick',historyPeriod:'thisMonth',showHidden:false,searchQuery:''};
+const state={open:false,status:null,recent:[],history:[],searchCorpus:[],searchResults:[],selected:null,pending:[],loading:false,message:'',messageType:'',activeTab:'quick',historyPeriod:'thisMonth',showHidden:false,searchQuery:'',draft:null};
 
 export function splitCsv(value=''){return [...new Set(String(value).split(/[，,]/).map(x=>x.trim()).filter(Boolean))].slice(0,30);}
 export function todayLocal(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
@@ -15,6 +15,18 @@ export function visibleTags(tags=[]){return (Array.isArray(tags)?tags:[]).map(St
 export function periodBounds(kind='thisMonth',now=new Date()){const ds=d=>todayLocal(d),y=now.getFullYear(),m=now.getMonth();if(kind==='thisMonth')return {from:ds(new Date(y,m,1)),to:ds(new Date(y,m+1,0)),label:'本月'};if(kind==='lastMonth')return {from:ds(new Date(y,m-1,1)),to:ds(new Date(y,m,0)),label:'上月'};if(kind==='thisYear')return {from:ds(new Date(y,0,1)),to:ds(new Date(y,11,31)),label:'今年'};if(kind==='lastYear')return {from:ds(new Date(y-1,0,1)),to:ds(new Date(y-1,11,31)),label:'去年'};return {from:null,to:null,label:'全部'};}
 export function searchEntriesLocal(entries=[],query=''){const q=String(query||'').trim().toLocaleLowerCase('zh-TW');if(!q)return [];return (Array.isArray(entries)?entries:[]).filter(e=>{const hay=[e.entry_date,e.title,e.summary,...visibleTags(e.tags),...(Array.isArray(e.participants)?e.participants:[]),...extractPlaces(e)].filter(Boolean).join(' ').toLocaleLowerCase('zh-TW');return hay.includes(q);});}
 export function groupHistory(entries=[]){const map=new Map();for(const e of Array.isArray(entries)?entries:[]){const key=String(e.entry_date||'').slice(0,7)||'unknown';if(!map.has(key))map.set(key,[]);map.get(key).push(e);}return [...map.entries()].map(([key,items])=>({key,items,places:[...new Set(items.flatMap(extractPlaces))]}));}
+export function normalizeTripDraft(input={}){
+  const places=[...new Set((Array.isArray(input.places)?input.places:[]).map(String).map(x=>x.trim()).filter(Boolean))].slice(0,20);
+  const tags=[...new Set((Array.isArray(input.tags)?input.tags:[]).map(String).map(x=>x.trim()).filter(Boolean))].slice(0,30);
+  const participants=[...new Set((Array.isArray(input.participants)?input.participants:[]).map(String).map(x=>x.trim()).filter(Boolean))].slice(0,20);
+  return {
+    entryDate:String(input.entryDate||todayLocal()),
+    title:String(input.title||'').trim(),
+    summary:String(input.summary||'').trim(),
+    places,tags,participants,
+    tripRef:input.tripRef==null||String(input.tripRef).trim()===''?null:String(input.tripRef).trim()
+  };
+}
 
 function esc(v=''){return String(v).replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));}
 function fmtDate(s=''){if(!s)return '';const d=new Date(`${s}T12:00:00`);return Number.isNaN(d.getTime())?s:new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'numeric',day:'numeric',weekday:'short'}).format(d);}
