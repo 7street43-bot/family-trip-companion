@@ -100,7 +100,24 @@ function editorHtml(){
   </form>`;
 }
 
-function render(){const r=root();if(!r)return;r.hidden=!state.open;journalShell.setOpen(state.open);if(!state.open){journalShell.rendered({open:false,tab:'quick',selectedEntryId:null,pending:state.pending.length,loading:false});return;}r.classList.toggle('journal-loading',state.loading);const source=state.status?.source||(isDesktop()?'desktop':'mobile'),version=journalShell.runtimeVersion();r.innerHTML=`<section class="journal-panel" role="dialog" aria-modal="true" aria-labelledby="journalTitle"><div class="journal-head"><div class="journal-head-copy"><h2 id="journalTitle">旅遊日誌</h2><small>${source==='desktop'?'新增、搜尋、整理':'新增、搜尋、照片'}｜${esc(version)}</small></div><button class="journal-icon-btn" type="button" data-journal-sync title="同步" aria-label="同步日誌">↻</button><button class="journal-close" type="button" data-journal-close aria-label="關閉">×</button></div><div class="journal-body"><div class="journal-left">${state.message?`<div class="journal-alert ${esc(state.messageType)}">${esc(state.message)}</div>`:''}${statusHtml()}${mainHtml()}</div><div class="journal-right">${editorHtml()}</div></div></section>`;journalShell.rendered({open:true,tab:'quick',selectedEntryId:state.selected?.entry?.id||null,pending:state.pending.length,loading:state.loading});}
+function render(){
+  const r=root();if(!r)return;
+  r.hidden=!state.open;journalShell.setOpen(state.open);
+  if(!state.open){journalShell.rendered({open:false,tab:'quick',selectedEntryId:null,pending:state.pending.length,loading:false});return;}
+  r.classList.toggle('journal-loading',state.loading);
+  const panelClass='journal-panel'+(state.selected?' has-selection':'')+((state.composing||state.draft)?' has-composer':'');
+  r.innerHTML=`<section class="${panelClass}" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
+    <div class="journal-head">
+      <div class="journal-head-copy"><h2 id="journalTitle">旅遊日誌</h2></div>
+      <button class="journal-close" type="button" data-journal-close aria-label="關閉">×</button>
+    </div>
+    <div class="journal-body">
+      <div class="journal-left">${state.message?`<div class="journal-alert ${esc(state.messageType)}">${esc(state.message)}</div>`:''}${statusHtml()}${mainHtml()}</div>
+      <div class="journal-right">${editorHtml()}</div>
+    </div>
+  </section>`;
+  journalShell.rendered({open:true,tab:'quick',selectedEntryId:state.selected?.entry?.id||null,pending:state.pending.length,loading:state.loading});
+}
 
 async function openJournal(){state.open=true;journalShell.setOpen(true);clearMessage();state.pending=await readQueue();syncFab();await refreshStatus();render();if(canRead()){await flushQueue();await loadActive();}else render();return true;}
 async function openDraft(input={}){
