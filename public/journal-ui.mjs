@@ -3,7 +3,7 @@ import journalShell from './journal-shell.mjs';
 
 const QUEUE_KEY='journalJ1FQueue';
 const PLACE_PREFIX='@place:';
-const state={open:false,status:null,recent:[],searchCorpus:[],searchResults:[],selected:null,pending:[],loading:false,message:'',messageType:'',searchQuery:'',draft:null};
+const state={open:false,status:null,recent:[],searchCorpus:[],searchResults:[],selected:null,pending:[],loading:false,message:'',messageType:'',searchQuery:'',draft:null,composing:false};
 
 export function splitCsv(value=''){return [...new Set(String(value).split(/[，,]/).map(x=>x.trim()).filter(Boolean))].slice(0,30);}
 export function todayLocal(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
