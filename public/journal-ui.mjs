@@ -90,7 +90,29 @@ function simpleSearchHtml(){
 }
 function activeTabHtml(){return quickForm()+simpleSearchHtml();}
 
-function editorHtml(){const e=state.selected?.entry;if(!e)return `<div class="journal-editor"><div class="journal-empty">選一篇日誌即可在這裡完整維護。</div></div>`;const places=extractPlaces(e),tags=visibleTags(e.tags);return `<form id="journalEditForm" class="journal-editor" data-id="${esc(e.id)}" data-version="${Number(e.version)||1}"><h3>編輯日誌${e.deleted_at?'｜已收起':''}</h3><div class="journal-fields"><div class="journal-row"><div class="journal-field"><label>日期</label><input name="entryDate" type="date" value="${esc(e.entry_date||'')}" required></div><div class="journal-field"><label>地點</label><input name="places" value="${esc(places.join(', '))}"></div></div><div class="journal-field"><label>標題</label><input name="title" maxlength="120" value="${esc(e.title||'')}"></div><div class="journal-field"><label>內容</label><textarea name="summary" maxlength="12000">${esc(e.summary||'')}</textarea></div><div class="journal-row"><div class="journal-field"><label>標籤</label><input name="tags" value="${esc(tags.join(', '))}"></div><div class="journal-field"><label>人物</label><input name="participants" value="${esc((e.participants||[]).join(', '))}"></div></div></div><section id="journalMediaSection" class="journal-media-section" data-entry-id="${esc(e.id)}"></section><div class="journal-actions"><button class="journal-primary" type="submit">儲存修改</button><button class="journal-secondary" type="button" data-journal-trip-memory="${esc(e.id)}">查看這趟旅程</button>${e.deleted_at?`<button class="journal-secondary" type="button" data-journal-restore="${esc(e.id)}" data-version="${Number(e.version)||1}">恢復顯示</button>`:`<button class="journal-danger" type="button" data-journal-archive="${esc(e.id)}" data-version="${Number(e.version)||1}">收起這篇</button>`}</div></form>`;}
+function editorHtml(){
+  const e=state.selected?.entry;
+  if(!e)return `<div class="journal-editor"><div class="journal-empty">點一篇日誌即可查看或修改。</div></div>`;
+  const places=extractPlaces(e),tags=visibleTags(e.tags);
+  return `<form id="journalEditForm" class="journal-editor" data-id="${esc(e.id)}" data-version="${Number(e.version)||1}">
+    <h3>編輯日誌${e.deleted_at?'｜已收起':''}</h3>
+    <input name="places" type="hidden" value="${esc(places.join(', '))}">
+    <input name="tags" type="hidden" value="${esc(tags.join(', '))}">
+    <input name="participants" type="hidden" value="${esc((e.participants||[]).join(', '))}">
+    <div class="journal-fields">
+      <div class="journal-field"><label>日期</label><input name="entryDate" type="date" value="${esc(e.entry_date||'')}" required></div>
+      <div class="journal-field"><label>標題 <small>可不填</small></label><input name="title" maxlength="120" value="${esc(e.title||'')}"></div>
+      <div class="journal-field"><label>內容</label><textarea name="summary" maxlength="12000">${esc(e.summary||'')}</textarea></div>
+    </div>
+    <section id="journalMediaSection" class="journal-media-section" data-entry-id="${esc(e.id)}"></section>
+    <div class="journal-actions">
+      <button class="journal-primary" type="submit">儲存修改</button>
+      ${e.deleted_at
+        ? `<button class="journal-secondary" type="button" data-journal-restore="${esc(e.id)}" data-version="${Number(e.version)||1}">恢復顯示</button>`
+        : `<button class="journal-danger" type="button" data-journal-archive="${esc(e.id)}" data-version="${Number(e.version)||1}">收起這篇</button>`}
+    </div>
+  </form>`;
+}
 
 function render(){const r=root();if(!r)return;r.hidden=!state.open;journalShell.setOpen(state.open);if(!state.open){journalShell.rendered({open:false,tab:state.activeTab,selectedEntryId:null,pending:state.pending.length,loading:false});return;}r.classList.toggle('journal-loading',state.loading);const source=state.status?.source||(isDesktop()?'desktop':'mobile'),version=journalShell.runtimeVersion();r.innerHTML=`<section class="journal-panel" role="dialog" aria-modal="true" aria-labelledby="journalTitle"><div class="journal-head"><div class="journal-head-copy"><h2 id="journalTitle">旅遊日誌</h2><small>${source==='desktop'?'電腦完整維護':'手機紀錄與回顧'}｜${esc(version)}</small></div><button class="journal-icon-btn" type="button" data-journal-sync title="同步" aria-label="同步日誌">↻</button><button class="journal-close" type="button" data-journal-close aria-label="關閉">×</button></div>${tabsHtml()}<div class="journal-body"><div class="journal-left">${state.message?`<div class="journal-alert ${esc(state.messageType)}">${esc(state.message)}</div>`:''}${statusHtml()}<section id="journalPreviewMediaSlot"></section>${activeTabHtml()}</div><div class="journal-right">${editorHtml()}</div></div></section>`;journalShell.rendered({open:true,tab:state.activeTab,selectedEntryId:state.selected?.entry?.id||null,pending:state.pending.length,loading:state.loading});}
 
