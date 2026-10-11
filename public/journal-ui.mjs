@@ -12,6 +12,8 @@ export function queueRecord(input,mutationId,now=new Date().toISOString()){retur
 export function encodePlaceTags(places=[],tags=[]){const normal=(Array.isArray(tags)?tags:[]).map(String).map(x=>x.trim()).filter(x=>x&&!x.startsWith(PLACE_PREFIX));const placeTags=(Array.isArray(places)?places:[]).map(String).map(x=>x.trim()).filter(Boolean).map(x=>`${PLACE_PREFIX}${x}`);return [...new Set([...normal,...placeTags])].slice(0,60);}
 export function extractPlaces(entry={}){return [...new Set((Array.isArray(entry.tags)?entry.tags:[]).map(String).filter(x=>x.startsWith(PLACE_PREFIX)).map(x=>x.slice(PLACE_PREFIX.length).trim()).filter(Boolean))];}
 export function visibleTags(tags=[]){return (Array.isArray(tags)?tags:[]).map(String).filter(x=>!x.startsWith(PLACE_PREFIX));}
+export function periodBounds(kind='thisMonth',now=new Date()){const ds=d=>todayLocal(d),y=now.getFullYear(),m=now.getMonth();if(kind==='thisMonth')return {from:ds(new Date(y,m,1)),to:ds(new Date(y,m+1,0)),label:'本月'};if(kind==='lastMonth')return {from:ds(new Date(y,m-1,1)),to:ds(new Date(y,m,0)),label:'上月'};if(kind==='thisYear')return {from:ds(new Date(y,0,1)),to:ds(new Date(y,11,31)),label:'今年'};if(kind==='lastYear')return {from:ds(new Date(y-1,0,1)),to:ds(new Date(y-1,11,31)),label:'去年'};return {from:null,to:null,label:'全部'};}
+export function groupHistory(entries=[]){const map=new Map();for(const e of Array.isArray(entries)?entries:[]){const key=String(e.entry_date||'').slice(0,7)||'unknown';if(!map.has(key))map.set(key,[]);map.get(key).push(e);}return [...map.entries()].map(([key,items])=>({key,items,places:[...new Set(items.flatMap(extractPlaces))]}));}
 export function searchEntriesLocal(entries=[],query=''){const q=String(query||'').trim().toLocaleLowerCase('zh-TW');if(!q)return [];return (Array.isArray(entries)?entries:[]).filter(e=>{const hay=[e.entry_date,e.title,e.summary,...visibleTags(e.tags),...(Array.isArray(e.participants)?e.participants:[]),...extractPlaces(e)].filter(Boolean).join(' ').toLocaleLowerCase('zh-TW');return hay.includes(q);});}
 export function normalizeTripDraft(input={}){
   const places=[...new Set((Array.isArray(input.places)?input.places:[]).map(String).map(x=>x.trim()).filter(Boolean))].slice(0,20);
@@ -123,4 +125,4 @@ function mount(){if(document.getElementById('journalFab'))return;const fab=docum
 
 if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();}
 
-export const __test={splitCsv,todayLocal,entryLabel,queueRecord,encodePlaceTags,extractPlaces,visibleTags,searchEntriesLocal,normalizeTripDraft};
+export const __test={splitCsv,todayLocal,entryLabel,queueRecord,encodePlaceTags,extractPlaces,visibleTags,periodBounds,searchEntriesLocal,groupHistory,normalizeTripDraft};
