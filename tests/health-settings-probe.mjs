@@ -13,7 +13,7 @@ try {
   const page=await context.newPage();
   const errors=[];
   const clickStages=[];
-  page.on('console',msg=>{if(msg.text().startsWith('HEALTH_CLICK_'))clickStages.push(msg.text());});
+  page.on('console',msg=>{if(msg.text().startsWith('HEALTH_CLICK_') || msg.text().startsWith('HEALTH_SETTING_'))clickStages.push(msg.text());});
   page.on('dialog',dialog=>{clickStages.push('DIALOG:'+dialog.type());dialog.dismiss().catch(()=>{});});
   await page.addInitScript(()=>{
     document.addEventListener('pointerdown',event=>{if(event.target.closest?.('#settingsBtn'))console.log('HEALTH_CLICK_POINTER');},true);
