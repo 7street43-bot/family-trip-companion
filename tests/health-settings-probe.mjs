@@ -15,6 +15,7 @@ try {
   page.on('pageerror',e=>errors.push(String(e?.message||e)));
   await page.goto(base,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>!!window.TwinDB,{timeout:20000});
+  await page.waitForFunction(()=>document.querySelector('#app')?.children.length>0 && !!document.querySelector('button[data-view="home"].active'),null,{timeout:20000});
   let outcome='PASS',extra=null;
   try{
    await page.locator('#settingsBtn').click({timeout:6500,noWaitAfter:true});
