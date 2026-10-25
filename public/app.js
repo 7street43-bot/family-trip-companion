@@ -1791,8 +1791,8 @@
   function renderExploreOnly() { if (state.view==='explore') render(); }
 
   function showModal(title, body, {wide=false}={}) {
-    modalRoot.innerHTML=`<section class="modal-sheet ${wide?'wide':''}" role="dialog" aria-modal="true"><div class="modal-head"><h2 class="modal-title">${esc(title)}</h2><button class="close-btn" data-close-modal aria-label="關閉">×</button></div>${body}</section>`;
     modalRoot.hidden=false;
+    modalRoot.innerHTML=`<section class="modal-sheet ${wide?'wide':''}" role="dialog" aria-modal="true"><div class="modal-head"><h2 class="modal-title">${esc(title)}</h2><button class="close-btn" data-close-modal aria-label="關閉">×</button></div>${body}</section>`;
     document.body.style.overflow='hidden';
   }
   function closeModal() { modalRoot.hidden=true; modalRoot.innerHTML=''; document.body.style.overflow=''; }
@@ -3221,11 +3221,9 @@
   }
 
   function settingsModal() {
-    console.log('HEALTH_SETTING_ENTER');
     const counts=Object.fromEntries(Object.keys(TYPE_LABELS).map(t=>[t,state.entities.filter(e=>e.entityType===t).length]));
     const autoCount=state.entities.filter(e=>e.googlePlaceId).length;
     const missingCount=state.entities.filter(e=>!e.coverImage&&!e.googlePlaceId).length;
-    console.log('HEALTH_SETTING_PRE_SHOW');
     showModal('設定與資料', `<div class="setting-block"><h3>App 顯示名稱</h3><p>可以把頁首「雙寶出遊」改成你自己的名稱。</p><div class="field"><input id="appTitleSetting" type="text" value="${esc(currentAppTitle())}" maxlength="20" placeholder="例如：雙寶出遊" /></div><button class="btn primary full" style="margin-top:10px" data-save-app-title>儲存名稱</button><div class="helper" style="margin-top:8px">會同步到 App 頁首與瀏覽器標題；已加入主畫面的圖示名稱可能受 PWA 安裝快取限制。</div></div>
       <div class="setting-block"><h3>頁首圖示</h3><p>可以把名稱左邊的熊改成自己的家庭圖示；只影響 App 內頁首，不會強制改手機主畫面 PWA 圖示。</p><div class="brand-icon-setting"><div class="brand-icon-preview">${state.settings.appIconImage?`<img src="${esc(state.settings.appIconImage)}" alt="目前圖示" />`:'🐻'}</div><div class="field"><input id="appIconSetting" type="file" accept="image/*" /><div class="helper">會自動裁成正方形並縮到 256×256。</div></div></div><div class="form-actions"><button class="btn" data-reset-app-icon>恢復熊圖示</button><button class="btn primary" data-save-app-icon>儲存圖示</button></div></div>
       <div class="setting-block"><h3>雙寶生日</h3><p>只有填寫後，才會啟用「適合目前年齡」；未有結構化年齡資料的景點不會被猜測。</p><div class="field"><input id="birthdateSetting" type="date" value="${esc(state.settings.childBirthdate||'')}" /></div><button class="btn primary full" style="margin-top:10px" data-save-birthdate>儲存生日</button></div>
@@ -3238,9 +3236,7 @@
       <div class="setting-block"><h3>目前資料</h3><p>景點 ${counts.attraction}・住宿 ${counts.hotel}・餐廳 ${counts.restaurant}・其他收藏 ${counts.activity}・自訂主題 ${exploreThemes().length}・外出包 ${state.packItems.length}・行程 ${state.itineraries.length}</p></div>
       <div class="setting-block"><h3>備份與還原</h3><p>V4.5 採「Supabase 雲端正式資料＋IndexedDB 離線快取」；JSON 匯出仍保留作額外人工備份。</p><div class="form-grid"><button class="btn" data-export-json>匯出 JSON</button><button class="btn" data-import-json>匯入 JSON</button></div></div>
       <div class="setting-block"><h3>離線範圍</h3><p>核心資料與行程可離線使用；重新連線後再同步雲端。Google Places 網路封面、地圖、外部網站與即時資訊需網路。</p></div>`);
-    console.log('HEALTH_SETTING_AFTER_SHOW');
     hydrateCloudSyncSettings();
-    console.log('HEALTH_SETTING_AFTER_HYDRATE');
   }
 
   async function exportJson() {
