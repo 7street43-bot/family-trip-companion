@@ -3239,7 +3239,7 @@
       <div class="setting-block"><h3>備份與還原</h3><p>V4.5 採「Supabase 雲端正式資料＋IndexedDB 離線快取」；JSON 匯出仍保留作額外人工備份。</p><div class="form-grid"><button class="btn" data-export-json>匯出 JSON</button><button class="btn" data-import-json>匯入 JSON</button></div></div>
       <div class="setting-block"><h3>離線範圍</h3><p>核心資料與行程可離線使用；重新連線後再同步雲端。Google Places 網路封面、地圖、外部網站與即時資訊需網路。</p></div>`);
     console.log('HEALTH_SETTING_AFTER_SHOW');
-    hydrateCloudSyncSettings();
+    setTimeout(()=>{ if(!modalRoot.hidden && $('#cloudSyncStatus')) hydrateCloudSyncSettings(); },0);
     console.log('HEALTH_SETTING_AFTER_HYDRATE');
   }
 
