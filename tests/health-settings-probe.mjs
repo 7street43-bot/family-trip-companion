@@ -27,7 +27,18 @@ try {
    outcome='FAIL';
    extra=String(e?.message||e).slice(0,420);
   }
-  const evidence={profile:p.name,outcome,error:extra,pageErrors:errors.slice(0,4)};
+  let modalState='unread';
+  try {
+    modalState=await Promise.race([
+      page.evaluate(()=>({
+        hidden:document.getElementById('modalRoot')?.hidden,
+        hasTitle:document.getElementById('modalRoot')?.innerText?.includes('設定與資料'),
+        bodyOverflow:document.body.style.overflow
+      })),
+      new Promise(resolve=>setTimeout(()=>resolve('probe-timeout'),1500))
+    ]);
+  } catch(e) {modalState='probe-error:'+String(e?.message||e).slice(0,100);}
+  const evidence={profile:p.name,outcome,error:extra,modalState,pageErrors:errors.slice(0,4)};
   console.log('HEALTH_SETTINGS_PROBE '+JSON.stringify(evidence));
   await context.close();
  }
