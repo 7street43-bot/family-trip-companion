@@ -1,0 +1,70 @@
+name: Family Trip Light Health Gate
+on:
+  push:
+    branches:
+      - 'health/**'
+    paths:
+      - 'tests/health-*.mjs'
+      - '.github/workflows/health-light-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare exact candidate runtime
+        run: node scripts/prepare-site.mjs
+      - name: Syntax and existing contracts
+        run: |
+          set -euo pipefail
+          node --check public/app.js
+          node --check public/journal-ui.mjs
+          node --check public/itinerary-v2.mjs
+          node --check public/sw.js
+          node --test tests/j2a-itinerary-v2.test.mjs
+          node --test tests/j2a-candidate-pool.test.mjs
+          node --test tests/j2b-origin.test.mjs
+          node --test tests/j2b-route-matrix.test.mjs
+          node --test tests/j2c-timeline.test.mjs
+          node --test tests/journal-j1f-ui.test.mjs
+          node --test tests/journal-j1g-media-client.test.mjs
+          node --test tests/journal-gpt-gateway.test.mjs
+      - name: Isolated family-size load data
+        run: |
+          set -euo pipefail
+          node tests/health-light-core.mjs
+      - name: Result
+        run: echo 'HEALTH FIXTURE AND CORE REGRESSION = PASS'
+
+  mobile-desktop-webkit:
+    needs: fixture-and-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare exact candidate runtime
+        run: node scripts/prepare-site.mjs
+      - name: Install WebKit in isolated runner
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps webkit
+      - name: Start isolated local preview
+        run: |
+          python3 -m http.server 4173 --directory public >/tmp/family-health-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/version.json >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/family-health-http.log
+          exit 1
+      - name: iPhone-size and desktop route and Journal actions
+        env:
+          HEALTH_BASE_URL: http://127.0.0.1:4173
+        run: node tests/health-webkit-smoke.mjs
+      - name: Result
+        run: echo 'HEALTH WEBKIT MOBILE AND DESKTOP = PASS'
