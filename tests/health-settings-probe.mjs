@@ -24,6 +24,18 @@ try {
   await page.goto(base,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>!!window.TwinDB,{timeout:20000});
   await page.waitForFunction(()=>document.querySelector('#app')?.children.length>0 && !!document.querySelector('button[data-view="home"].active'),null,{timeout:20000});
+  const nativeProbe = await Promise.race([
+    page.evaluate(()=>{
+      document.querySelector('#settingsBtn').click();
+      const modal=document.querySelector('#modalRoot');
+      return {modalOpen:!modal?.hidden,title:modal?.querySelector('.modal-title')?.textContent||''};
+    }).then(result=>({state:'returned',...result})).catch(err=>({state:'error',message:String(err?.message||err).slice(0,160)})),
+    new Promise(resolve=>setTimeout(()=>resolve({state:'timeout'}),3000))
+  ]);
+  console.log('HEALTH_SETTINGS_NATIVE '+JSON.stringify({profile:p.name,...nativeProbe}));
+  if(nativeProbe.state==='returned' && nativeProbe.modalOpen){
+    await page.evaluate(()=>document.querySelector('#modalRoot [data-close-modal]')?.click());
+  }
   let outcome='PASS',extra=null;
   try{
    await page.locator('#settingsBtn').click({timeout:6500,noWaitAfter:true});
