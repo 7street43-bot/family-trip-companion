@@ -12,6 +12,14 @@ try {
   const context=await browser.newContext({viewport:p.viewport,isMobile:p.isMobile,hasTouch:p.isMobile,serviceWorkers:'block'});
   const page=await context.newPage();
   const errors=[];
+  const clickStages=[];
+  page.on('console',msg=>{if(msg.text().startsWith('HEALTH_CLICK_'))clickStages.push(msg.text());});
+  page.on('dialog',dialog=>{clickStages.push('DIALOG:'+dialog.type());dialog.dismiss().catch(()=>{});});
+  await page.addInitScript(()=>{
+    document.addEventListener('pointerdown',event=>{if(event.target.closest?.('#settingsBtn'))console.log('HEALTH_CLICK_POINTER');},true);
+    document.addEventListener('click',event=>{if(event.target.closest?.('#settingsBtn'))console.log('HEALTH_CLICK_CAPTURE');},true);
+    document.addEventListener('click',event=>{if(event.target.closest?.('#settingsBtn'))console.log('HEALTH_CLICK_BUBBLE');});
+  });
   page.on('pageerror',e=>errors.push(String(e?.message||e)));
   await page.goto(base,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>!!window.TwinDB,{timeout:20000});
@@ -39,7 +47,7 @@ try {
       new Promise(resolve=>setTimeout(()=>resolve('probe-timeout'),1500))
     ]);
   } catch(e) {modalState='probe-error:'+String(e?.message||e).slice(0,100);}
-  const evidence={profile:p.name,outcome,error:extra,modalState,pageErrors:errors.slice(0,4)};
+  const evidence={profile:p.name,outcome,error:extra,modalState,clickStages,pageErrors:errors.slice(0,4)};
   console.log('HEALTH_SETTINGS_PROBE '+JSON.stringify(evidence));
   await context.close();
  }
