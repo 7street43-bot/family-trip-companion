@@ -68,14 +68,17 @@ function quickForm(){
   </form>`;
 }
 function entryButton(e){const places=extractPlaces(e);return `<button class="journal-item ${state.selected?.entry?.id===e.id?'active':''}" data-journal-select="${esc(e.id)}"><div class="journal-item-title"><strong>${esc(entryLabel(e))}</strong></div><small>${esc(fmtDate(e.entry_date))}</small>${places.length?`<div class="journal-place-line">📍 ${places.map(esc).join('、')}</div>`:''}${e.summary?`<p>${esc(e.summary)}</p>`:''}</button>`;}
-function simpleSearchHtml(){
+function searchResultsHtml(){
   const result=state.searchQuery?state.searchResults:state.recent;
   let body='';
   if(!state.status?.originMatch)body='<div class="journal-empty">Preview 不讀正式日誌資料。</div>';
   else if(!state.status?.authenticated)body='<div class="journal-empty">登入後會顯示你的日誌。</div>';
   else if(!result.length)body=state.searchQuery?'<div class="journal-empty">找不到符合的日誌。</div>':'<div class="journal-empty">還沒有日誌。先新增第一篇。</div>';
   else body='<div class="journal-list">'+result.map(entryButton).join('')+'</div>';
-  return '<form id="journalSearchForm" class="journal-search-simple"><input name="query" value="'+esc(state.searchQuery)+'" placeholder="搜尋日誌"><button class="journal-secondary" type="submit">搜尋</button></form><div class="journal-section-title"><h3>'+(state.searchQuery?'搜尋結果':'最近日誌')+'</h3><span>'+result.length+' 篇</span></div>'+body;
+  return '<div class="journal-section-title"><h3>'+(state.searchQuery?'搜尋結果':'最近日誌')+'</h3><span>'+result.length+' 篇</span></div>'+body;
+}
+function simpleSearchHtml(){
+  return '<div class="journal-search-simple"><input type="search" data-journal-live-search value="'+esc(state.searchQuery)+'" placeholder="搜尋日誌" autocomplete="off"></div><div id="journalSearchResults">'+searchResultsHtml()+'</div>';
 }
 function mainHtml(){if(state.composing||state.draft)return quickForm();return '<button class="journal-new-btn" type="button" data-journal-new>＋ 新增日誌</button>'+simpleSearchHtml();}
 
