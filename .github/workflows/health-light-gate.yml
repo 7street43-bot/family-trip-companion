@@ -5,6 +5,7 @@ on:
       - 'health/**'
     paths:
       - 'tests/health-*.mjs'
+      - 'public/app.js'
       - '.github/workflows/health-light-gate.yml'
   workflow_dispatch:
 
