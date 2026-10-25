@@ -80,6 +80,22 @@ function searchResultsHtml(){
 function simpleSearchHtml(){
   return '<div class="journal-search-simple"><input type="search" data-journal-live-search value="'+esc(state.searchQuery)+'" placeholder="搜尋日誌" autocomplete="off"></div><div id="journalSearchResults">'+searchResultsHtml()+'</div>';
 }
+function refreshSearchResults(){
+  const el=document.getElementById('journalSearchResults');
+  if(el)el.innerHTML=searchResultsHtml();
+}
+function applyLiveSearch(value){
+  state.searchQuery=String(value||'').trim();
+  const corpus=state.searchCorpus.length?state.searchCorpus:state.recent;
+  state.searchResults=state.searchQuery?searchEntriesLocal(corpus,state.searchQuery):[];
+  refreshSearchResults();
+}
+async function primeSearchCorpus(){
+  if(!canRead()||state.searchCorpus.length)return;
+  state.searchCorpus=await journalBinding.listEntries({includeArchived:false,limit:500});
+  if(state.searchQuery)state.searchResults=searchEntriesLocal(state.searchCorpus,state.searchQuery);
+  refreshSearchResults();
+}
 function mainHtml(){if(state.composing||state.draft)return quickForm();return '<button class="journal-new-btn" type="button" data-journal-new>＋ 新增日誌</button>'+simpleSearchHtml();}
 
 function editorHtml(){
