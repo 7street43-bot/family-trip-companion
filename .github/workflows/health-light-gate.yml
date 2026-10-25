@@ -66,5 +66,9 @@ jobs:
         env:
           HEALTH_BASE_URL: http://127.0.0.1:4173
         run: node tests/health-webkit-smoke.mjs
+      - name: Settings action diagnostic
+        env:
+          HEALTH_BASE_URL: http://127.0.0.1:4173
+        run: node tests/health-settings-probe.mjs
       - name: Result
         run: echo 'HEALTH WEBKIT MOBILE AND DESKTOP = PASS'
