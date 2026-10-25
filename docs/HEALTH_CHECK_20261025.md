@@ -54,3 +54,14 @@ GitHub Actions Run 40186045487：
 先在隔離分支對設定入口做儀表化、事件階段二分診斷（pointer → click handler → showModal → hydrateCloudSyncSettings），定位真正阻塞，再做最小修補與 WebKit 回歸；其後修訂已過時的 J1K/J2A/J2B 測試腳本。Production 不應在這些 Gate 通過前發布這輪 Preview。
 
 本文件與測試碼只存在 `health/20261025-integration`，沒有合入 Preview/main。
+
+## 7. 2026-10-25 下一刀：設定入口定位與安全回復
+
+- Freshness：main HEAD=`3761d9d7d4671d85b5cce901a424850641df0da9`，Netlify published deploy `6aa202e29e1b2f00085643df` READY，不曾寫入 main 或 Production。
+- 初始化完成等待後仍 FAIL：Run `40187060165`，mobile / desktop 點擊均逾時；非僅首頁未 ready 所致。
+- DOM 事件階段追蹤：Run `40187440045`，兩種 profile 均收到 pointerdown、click capture，以及設定 handler 的 ENTER / PRE_SHOW / AFTER_SHOW / AFTER_HYDRATE；但 Playwright click 未完成、modal 後續 evaluate timeout。這不等於已證明 App 自身阻塞。
+- Candidate A「雲端狀態改用後續 task」Run `40187665782`：核心 PASS，但兩種 WebKit 點擊仍 FAIL，已撤銷。
+- Candidate B「hidden modal 先建 DOM 再顯示」Run `40187862670`：核心 PASS，但兩種 WebKit 點擊仍 FAIL，已撤銷。
+- 兩個失敗候選皆 rollback；health branch `public/app.js` 已 read-back 還原為原始 blob `040e979843f7e536c2df3dba1d529f35fa8624c7`。不可將兩個失敗方案合入 Preview / main。
+- 現有 `tests/health-settings-probe.mjs` 加入原生 DOM click 與 WebKit locator click 對照，但保留原有實際 locator Gate，不會用原生事件替代通過標準。
+- 下一個精確證據點：Actions Run `40188125782`（2026-10-25 11:20 UTC 查詢時仍 in_progress）；讀取 `HEALTH_SETTINGS_NATIVE` 與 `HEALTH_SETTINGS_PROBE` 分別判定 driver / App 互動；未得到結果前保持 `PARTIAL PASS`，不更動 App 功能與正式部署。
