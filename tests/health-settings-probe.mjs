@@ -34,7 +34,7 @@ try {
   ]);
   console.log('HEALTH_SETTINGS_NATIVE '+JSON.stringify({profile:p.name,...nativeProbe}));
   if(nativeProbe.state==='returned' && nativeProbe.modalOpen){
-    await page.evaluate(()=>document.querySelector('#modalRoot [data-close-modal]')?.click());
+    await page.reload({waitUntil:'domcontentloaded',timeout:15000});
   }
   let outcome='PASS',extra=null;
   try{
